@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>امتثال المباني في مشاريع تحسين الطرق ذات الأولوية</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Google Fonts: Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body,
+    html {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #090d16;
+      color: #f8fafc;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+      background: #090d16;
+    }
+
+    /* Translucent Frosted Gray Glass Badge */
+    .map-badge {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 18px;
+      padding: 14px 26px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      pointer-events: auto;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .map-badge:hover {
+      background: rgba(30, 41, 59, 0.88);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateX(-50%) translateY(-2px);
+    }
+
+    .map-badge h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff !important;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+    }
+
+    .map-badge p {
+      font-size: 0.85rem;
+      color: #ffffff !important;
+      margin-top: 4px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      opacity: 0.95;
+    }
+
+    .map-badge p span.dot {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Clean, Eye-friendly Road Paths */
+    path.leaflet-interactive {
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      cursor: pointer;
+      transition: stroke-width 0.2s ease, stroke-opacity 0.2s ease;
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+    }
+
+    path.leaflet-interactive:hover {
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.95)) !important;
+      stroke-opacity: 1 !important;
+    }
+
+    /* White terminal line cap (خط أبيض لبداية ونهاية الشارع) */
+    .terminal-line-icon {
+      background: transparent !important;
+      border: none !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .white-terminal-bar {
+      width: 15px;
+      height: 3px;
+      background-color: #ffffff;
+      border-radius: 2px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 1px rgba(0, 0, 0, 0.8);
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .terminal-line-icon:hover .white-terminal-bar {
+      background-color: #f8fafc;
+      transform: scale(1.3) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 1), 0 0 4px #ffffff !important;
+    }
+
+    /* Modern Hover Floating Tooltip */
+    .modern-street-tooltip {
+      background: rgba(30, 41, 59, 0.78) !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      border-radius: 12px !important;
+      color: #ffffff !important;
+      font-family: 'Cairo', sans-serif !important;
+      font-size: 0.88rem !important;
+      font-weight: 700 !important;
+      padding: 6px 14px !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+      direction: rtl !important;
+    }
+
+    .modern-street-tooltip::before {
+      display: none !important;
+    }
+
+    /* Custom Leaflet Popup Styling (Translucent Frosted Gray Glass) */
+    .leaflet-popup-content-wrapper {
+      background: rgba(30, 41, 59, 0.75) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+      font-family: 'Cairo', sans-serif !important;
+      direction: rtl !important;
+      padding: 6px !important;
+      color: #ffffff !important;
+    }
+
+    .leaflet-popup-tip {
+      background: rgba(30, 41, 59, 0.75) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    }
+
+    .leaflet-popup-content {
+      margin: 14px 18px !important;
+      line-height: 1.5;
+    }
+
+    .popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .popup-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff !important;
+      line-height: 1.3;
+    }
+
+    .city-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff !important;
+    }
+
+    /* Prominent Street Length Highlight Box */
+    .length-metric-card {
+      margin: 10px 0 12px 0;
+      padding: 10px 14px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      background: rgba(30, 41, 59, 0.65) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .length-metric-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #ffffff !important;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .length-metric-value {
+      font-size: 1.18rem;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .popup-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .popup-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 0.88rem;
+    }
+
+    .popup-row span.label {
+      color: #ffffff !important;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+
+    .popup-row span.value {
+      font-weight: 700;
+      color: #ffffff !important;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Inspectors section inside popup */
+    .inspectors-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .inspectors-title {
+      font-size: 0.84rem;
+      color: #ffffff !important;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .inspectors-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .inspector-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(30, 41, 59, 0.6) !important;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      color: #ffffff !important;
+      font-weight: 700;
+    }
+
+    .inspector-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.74rem;
+      color: #ffffff !important;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .leaflet-container a.leaflet-popup-close-button {
+      color: #ffffff !important;
+      padding: 8px !important;
+      top: 8px !important;
+      left: 8px !important;
+      right: auto !important;
+      opacity: 0.85;
+    }
+
+    .leaflet-container a.leaflet-popup-close-button:hover {
+      color: #ffffff !important;
+      opacity: 1;
+    }
+
+    /* Dark Modern Controls (Translucent Gray Glass) */
+    .leaflet-control-zoom {
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+      border-radius: 14px !important;
+      overflow: hidden;
+      background: transparent !important;
+    }
+
+    .leaflet-control-zoom a {
+      background-color: rgba(30, 41, 59, 0.75) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      color: #ffffff !important;
+      border: none !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+      transition: all 0.2s ease;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background-color: rgba(30, 41, 59, 0.9) !important;
+      color: #ffffff !important;
+    }
+
+    .leaflet-control-layers {
+      background: rgba(30, 41, 59, 0.75) !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45) !important;
+      color: #ffffff !important;
+      font-family: 'Cairo', sans-serif !important;
+      padding: 10px 14px !important;
+      font-size: 0.86rem !important;
+    }
+
+    .leaflet-control-layers-toggle {
+      filter: invert(1) brightness(1.5);
+    }
+
+    /* Building Marker Pin Styles */
+    .building-div-icon {
+      background: transparent !important;
+      border: none !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .building-pin-card {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1.5px solid #00843D;
+      border-radius: 10px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 132, 61, 0.35);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .building-pin-card:hover {
+      transform: scale(1.12);
+      background: rgba(30, 41, 59, 0.95);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 132, 61, 0.6);
+      border-color: #ffffff;
+    }
+
+    .building-pin-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    .building-pin-badge {
+      background: #00843D;
+      color: #ffffff !important;
+      font-size: 0.78rem;
+      font-weight: 800;
+      border-radius: 6px;
+      padding: 1px 6px;
+      line-height: 1.3;
+      letter-spacing: -0.2px;
+    }
+
+    /* Status-Specific Pin Glow & Colors */
+    .pin-status-compliant {
+      border-color: #10b981 !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 14px rgba(16, 185, 129, 0.5) !important;
+    }
+    .pin-status-compliant .building-pin-badge {
+      background: #10b981 !important;
+    }
+
+    .pin-status-in-progress {
+      border-color: #f59e0b !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 14px rgba(245, 158, 11, 0.5) !important;
+    }
+    .pin-status-in-progress .building-pin-badge {
+      background: #f59e0b !important;
+    }
+
+    .pin-status-non-compliant {
+      border-color: #ef4444 !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 14px rgba(239, 68, 68, 0.5) !important;
+    }
+    .pin-status-non-compliant .building-pin-badge {
+      background: #ef4444 !important;
+    }
+
+    /* Before / After Photo Comparison Toggle in Popup */
+    .bldg-photo-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .bldg-photo-tab {
+      flex: 1;
+      padding: 5px 8px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      font-family: 'Cairo', sans-serif;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(15, 23, 42, 0.75);
+      color: #ffffff;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+    .bldg-photo-tab:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    .bldg-photo-tab.active {
+      background: #00843D;
+      border-color: #ffffff;
+      box-shadow: 0 2px 10px rgba(0, 132, 61, 0.5);
+    }
+
+    /* Top Link to Data Entry Screen */
+    .nav-entry-link-btn {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 1000;
+      background: rgba(30, 41, 59, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 14px;
+      padding: 10px 18px;
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      transition: all 0.2s ease;
+    }
+    .nav-entry-link-btn:hover {
+      background: #00843D;
+      border-color: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 15px 35px rgba(0, 132, 61, 0.45);
+    }
+
+    /* Executive Compliance KPI Summary Pills */
+    .kpi-pills-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .kpi-pill {
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #ffffff;
+    }
+    .kpi-pill:hover, .kpi-pill.active {
+      background: rgba(255, 255, 255, 0.24);
+      border-color: #ffffff;
+    }
+    .kpi-pill.pill-compliant {
+      color: #a7f3d0;
+      border-color: rgba(16, 185, 129, 0.45);
+    }
+    .kpi-pill.pill-in-progress {
+      color: #fde68a;
+      border-color: rgba(245, 158, 11, 0.45);
+    }
+    .kpi-pill.pill-non-compliant {
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+
+    /* Building Popup Image & Actions Styles */
+    .building-popup-img-wrap {
+      position: relative;
+      width: 100%;
+      height: 170px;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      background: #090d16;
+    }
+
+    .building-popup-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.3s ease, filter 0.3s ease;
+    }
+
+    .building-popup-img-wrap:hover .building-popup-img {
+      transform: scale(1.05);
+      filter: brightness(0.9);
+    }
+
+    .building-zoom-btn {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+
+    .building-popup-img-wrap:hover .building-zoom-btn {
+      background: #00843D;
+      border-color: #ffffff;
+      transform: scale(1.1);
+    }
+
+    .phone-badge-link {
+      background: rgba(0, 132, 61, 0.25);
+      color: #ffffff !important;
+      border: 1px solid #00843D;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 0.86rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .phone-badge-link:hover {
+      background: #00843D;
+      color: #ffffff !important;
+      box-shadow: 0 0 10px rgba(0, 132, 61, 0.5);
+    }
+
+    .google-maps-btn {
+      display: block;
+      text-align: center;
+      margin-top: 12px;
+      background: rgba(104, 59, 137, 0.3);
+      border: 1px solid #683B89;
+      color: #ffffff !important;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.84rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    /* Collapsible Municipalities Card */
+    .muni-card {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 1000;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      width: 260px;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: 'Cairo', sans-serif;
+      direction: rtl;
+    }
+
+    .muni-card-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(30, 41, 59, 0.5);
+      transition: background 0.2s ease;
+    }
+
+    .muni-card-header:hover {
+      background: rgba(30, 41, 59, 0.85);
+    }
+
+    .muni-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .muni-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .muni-total-badge {
+      background: rgba(0, 132, 61, 0.3);
+      border: 1px solid #00843D;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .muni-chevron-icon {
+      transition: transform 0.3s ease;
+    }
+
+    .muni-card.collapsed .muni-chevron-icon {
+      transform: rotate(180deg);
+    }
+
+    .muni-card-body {
+      max-height: 400px;
+      opacity: 1;
+      transition: max-height 0.35s ease, opacity 0.3s ease, padding 0.35s ease;
+      padding: 10px 14px 14px 14px;
+    }
+
+    .muni-card.collapsed .muni-card-body {
+      max-height: 0;
+      opacity: 0;
+      padding: 0 14px;
+      pointer-events: none;
+    }
+
+    .muni-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .muni-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .muni-item:hover {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateX(-3px);
+    }
+
+    .muni-item-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .muni-item-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .muni-item-count {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Top Action Button: Link to Entry Screen -->
+  <a href="entry.html" class="nav-entry-link-btn" title="فتح شاشة إدخال وتعديل المباني للموظف">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+    <span>منصة إدخال البيانات</span>
+  </a>
+
+  <!-- Minimal floating title badge & KPI Metrics -->
+  <div class="map-badge" id="map-info-badge">
+    <h1>امتثال المباني في مشاريع تحسين الطرق ذات الأولوية</h1>
+    <p id="total-streets-text">منطقة عسير</p>
+    
+    <!-- Executive KPI Pills (Filter by compliance status) -->
+    <div class="kpi-pills-row" id="kpi-pills-container">
+      <span class="kpi-pill active" id="filter-all" onclick="filterBuildingsMap('all')">الكل: <span id="kpi-total-val">0</span></span>
+      <span class="kpi-pill pill-compliant" id="filter-compliant" onclick="filterBuildingsMap('ممتثل')">🟢 ممتثل: <span id="kpi-compliant-val">0</span></span>
+      <span class="kpi-pill pill-in-progress" id="filter-in-progress" onclick="filterBuildingsMap('قيد المعالجة')">🟡 قيد المعالجة: <span id="kpi-in-progress-val">0</span></span>
+      <span class="kpi-pill pill-non-compliant" id="filter-non-compliant" onclick="filterBuildingsMap('إنذار')">🔴 إنذار: <span id="kpi-non-compliant-val">0</span></span>
+    </div>
+  </div>
+
+  <!-- Collapsible Municipalities Card (كارد عدد الشوارع في كل بلدية) -->
+  <div class="muni-card" id="muni-stats-card">
+    <div class="muni-card-header" id="muni-card-toggle" onclick="toggleMuniCard()">
+      <div class="muni-header-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00843D" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span> البلديات</span>
+      </div>
+      <div class="muni-header-actions">
+        <svg class="muni-chevron-icon" id="muni-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+    </div>
+    <div class="muni-card-body" id="muni-card-body">
+      <div class="muni-list" id="muni-list-container"></div>
+    </div>
+  </div>
+
+  <!-- Map container -->
+  <div id="map"></div>
+
+  <!-- Street GeoJSON Data & Decoupled Buildings Data -->
+  <script src="streets.js"></script>
+  <script src="buildings.js"></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // Initialize map
+    const map = L.map('map', {
+      zoomControl: true,
+      attributionControl: true
+    }).setView([18.22, 42.50], 12);
+
+    // Base layers
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Satellite place labels & boundaries overlay
+    const satelliteLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // Standard street basemap option
+    const osmStreet = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    });
+
+    // Terminal markers layer group
+    const terminalsLayer = L.layerGroup().addTo(map);
+
+    // Buildings and facilities layer group
+    const buildingsLayer = L.layerGroup().addTo(map);
+
+    // Layer switcher control (top-left)
+    L.control.layers({
+      'قمر صناعي (ستالايت)': satellite,
+      'خريطة شوارع': osmStreet
+    }, {
+      'أسماء الأماكن والحدود': satelliteLabels,
+      'خطوط بداية ونهاية الشوارع': terminalsLayer,
+      'المباني والمنشآت': buildingsLayer
+    }, { position: 'topleft' }).addTo(map);
+
+    // Calculate perpendicular angle for terminal white lines
+    function getTerminalAngle(pt, allLines) {
+      if (!allLines || allLines.length === 0) return 0;
+      for (const line of allLines) {
+        if (!line || line.length < 2) continue;
+        const first = line[0];
+        const last = line[line.length - 1];
+
+        const dFirst = Math.hypot(first[0] - pt[0], first[1] - pt[1]);
+        if (dFirst < 0.0001) {
+          const dx = (line[1][0] - first[0]) * Math.cos(first[1] * Math.PI / 180);
+          const dy = -(line[1][1] - first[1]);
+          return Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        }
+
+        const dLast = Math.hypot(last[0] - pt[0], last[1] - pt[1]);
+        if (dLast < 0.0001) {
+          const prev = line[line.length - 2];
+          const dx = (last[0] - prev[0]) * Math.cos(last[1] * Math.PI / 180);
+          const dy = -(last[1] - prev[1]);
+          return Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        }
+      }
+      return 0;
+    }
+
+    // Create perpendicular white bar marker icon
+    function createWhiteLineIcon(angleDeg) {
+      return L.divIcon({
+        className: 'terminal-line-icon',
+        html: `<div class="white-terminal-bar" style="transform: rotate(${Math.round(angleDeg)}deg);"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+    }
+
+    // Authorized Saudi National Theme Palette (Saudi Flag Green & Royal Saudi Lavender)
+    function getCityTheme(city) {
+      // Saudi Flag Green: #00843D
+      // Royal Saudi Lavender: #683B89
+      if (!city) return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: 'غير محدد' };
+      if (city.includes('أبها')) {
+        return { color: '#00843D', bg: 'rgba(0, 132, 61, 0.25)', name: 'أبها' }; // Saudi Flag Green
+      }
+      if (city.includes('خميس مشيط')) {
+        return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: 'خميس مشيط' }; // Royal Saudi Lavender
+      }
+      if (city.includes('بيشة')) {
+        return { color: '#00843D', bg: 'rgba(0, 132, 61, 0.25)', name: 'بيشة' }; // Saudi Flag Green
+      }
+      if (city.includes('محايل')) {
+        return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: 'محايل عسير' }; // Royal Saudi Lavender
+      }
+      if (city.includes('أحد رفيدة')) {
+        return { color: '#00843D', bg: 'rgba(0, 132, 61, 0.25)', name: 'أحد رفيدة' }; // Saudi Flag Green
+      }
+      return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: city };
+    }
+
+    // Calculate path distance strictly unified in kilometers (كم)
+    function calculateLengthKm(coordinates) {
+      if (!coordinates || coordinates.length < 2) return '0.00 كم';
+      let totalMeters = 0;
+      for (let i = 0; i < coordinates.length - 1; i++) {
+        const pt1 = L.latLng(coordinates[i][1], coordinates[i][0]);
+        const pt2 = L.latLng(coordinates[i + 1][1], coordinates[i + 1][0]);
+        totalMeters += pt1.distanceTo(pt2);
+      }
+      return (totalMeters / 1000).toFixed(2) + ' كم';
+    }
+
+    // Assigned observers mapping for Abha streets
+    const STREET_INSPECTORS = {
+      'طريق الأمير سلطان': [
+        'محمد مغرم عسيري',
+        'سعد عبيد ال مستور',
+        'نايف مدشوش'
+      ],
+      'سلطان - ابها': [
+        'محمد مغرم عسيري',
+        'سعد عبيد ال مستور',
+        'نايف مدشوش'
+      ],
+      'الملك فهد - ابها': [
+        'محمد مغرم عسيري',
+        'سعد عبيد ال مستور',
+        'نايف مدشوش',
+        'محمد ابراهيم ماطر',
+        'احمد مفرع المازني',
+        'عبدالله دحمان',
+        'سعيد منصور القحطاني'
+      ],
+      'طريق الملك فهد': [
+        'محمد مغرم عسيري',
+        'سعد عبيد ال مستور',
+        'نايف مدشوش',
+        'محمد ابراهيم ماطر',
+        'احمد مفرع المازني',
+        'عبدالله دحمان',
+        'سعيد منصور القحطاني'
+      ],
+      'ابو هريره': [
+        'ابراهيم هشار',
+        'ياسر السريعي'
+      ],
+      'طريق ابوهريرة': [
+        'ابراهيم هشار',
+        'ياسر السريعي'
+      ],
+      'المحاله - ابها': [
+        'يحيى هادي',
+        'ابراهيم عاطف',
+        'طلال ال شراع'
+      ],
+      'طريق المحالة': [
+        'يحيى هادي',
+        'ابراهيم عاطف',
+        'طلال ال شراع'
+      ]
+    };
+
+    let geojsonLayer;
+
+    if (window.STREETS_DATA) {
+      geojsonLayer = L.geoJSON(window.STREETS_DATA, {
+        style: function (feature) {
+          const city = feature.properties.folder || feature.properties.municipality || '';
+          const theme = getCityTheme(city);
+          return {
+            color: theme.color,
+            weight: 3.5,
+            opacity: 0.88,
+            lineCap: 'round',
+            lineJoin: 'round'
+          };
+        },
+        onEachFeature: function (feature, layer) {
+          const props = feature.properties || {};
+          const streetName = props.name || 'شارع بدون اسم';
+          const cityRaw = props.folder || props.municipality || 'غير محدد';
+          const theme = getCityTheme(cityRaw);
+          const id = props.unique_id || '-';
+
+          // Unified length from merged data
+          const lengthStr = props.total_length || '0.00 كم';
+
+          // Assigned inspectors for this street
+          const streetInspectors = (cityRaw && cityRaw.includes('أبها')) ? (STREET_INSPECTORS[streetName] || null) : null;
+          const inspectorsHtml = (streetInspectors && streetInspectors.length > 0) ? `
+            <div class="inspectors-section">
+              <div class="inspectors-title">أسماء المراقبين:</div>
+              <div class="inspectors-list">
+                ${streetInspectors.map((name, idx) => `
+                  <div class="inspector-item">
+                    <span class="inspector-num">${idx + 1}</span>
+                    <span>${name}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : '';
+
+          // Sleek Tooltip on Hover showing name and length
+          layer.bindTooltip(`
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${theme.color};margin-left:6px;border:1px solid #ffffff;"></span>
+            <strong style="color: #ffffff;">${streetName}</strong>
+            <span style="color: #ffffff; margin-right: 6px; font-weight: 700; opacity: 0.95;">(${lengthStr})</span>
+          `, {
+            sticky: true,
+            className: 'modern-street-tooltip'
+          });
+
+          // Modern Glassmorphism Popup on Click
+          const popupContent = `
+            <div class="popup-header">
+              <div class="popup-title">${streetName}</div>
+              <span class="city-badge" style="color: #ffffff; background: ${theme.bg}; border-color: ${theme.color};">
+                ${theme.name}
+              </span>
+            </div>
+
+            <!-- Prominent Street Length Box -->
+            <div class="length-metric-card" style="background: rgba(30, 41, 59, 0.65); border: 1px solid ${theme.color}60;">
+              <div class="length-metric-label">
+                <span>طول الشارع</span>
+              </div>
+              <div class="length-metric-value" style="color: #ffffff;">
+                ${lengthStr}
+              </div>
+            </div>
+
+            <div class="popup-body">
+              <div class="popup-row">
+                <span class="label">البلدية:</span>
+                <span class="value">${props.municipality || theme.name}</span>
+              </div>
+              ${id !== '-' ? `
+              <div class="popup-row">
+                <span class="label">المعرف:</span>
+                <span class="value">#${id}</span>
+              </div>` : ''}
+              ${inspectorsHtml}
+            </div>
+          `;
+          layer.bindPopup(popupContent);
+
+          // Add Start & End White Line Caps (خط أبيض متعامد لبداية ونهاية كل شارع)
+          if (props.start_coord && props.end_coord) {
+            const startPt = L.latLng(props.start_coord[1], props.start_coord[0]);
+            const endPt = L.latLng(props.end_coord[1], props.end_coord[0]);
+            const allLines = feature.geometry ? feature.geometry.coordinates : [];
+
+            const startAngle = getTerminalAngle(props.start_coord, allLines);
+            const endAngle = getTerminalAngle(props.end_coord, allLines);
+
+            // Start white line marker
+            const startMarker = L.marker(startPt, {
+              icon: createWhiteLineIcon(startAngle),
+              zIndexOffset: 1000
+            });
+            startMarker.bindTooltip(`بداية الشارع: ${streetName}`, {
+              sticky: true,
+              className: 'modern-street-tooltip'
+            });
+            startMarker.on('click', () => layer.openPopup());
+            terminalsLayer.addLayer(startMarker);
+
+            // End white line marker
+            const endMarker = L.marker(endPt, {
+              icon: createWhiteLineIcon(endAngle),
+              zIndexOffset: 1000
+            });
+            endMarker.bindTooltip(`نهاية الشارع: ${streetName}`, {
+              sticky: true,
+              className: 'modern-street-tooltip'
+            });
+            endMarker.on('click', () => layer.openPopup());
+            terminalsLayer.addLayer(endMarker);
+          }
+
+          // Smooth Hover Dynamics
+          layer.on({
+            mouseover: function (e) {
+              const l = e.target;
+              l.setStyle({
+                weight: 5.5,
+                opacity: 1
+              });
+              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                l.bringToFront();
+              }
+            },
+            mouseout: function (e) {
+              geojsonLayer.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(map);
+
+      // Dynamically update total features counter in badge
+      const countEl = document.getElementById('total-streets-text');
+      if (countEl) {
+        countEl.innerHTML = `منطقة عسير`;
+      }
+
+      // Build collapsible municipality statistics
+      buildMunicipalityList();
+
+      // Automatically adjust camera bounds to encompass all streets
+      const bounds = geojsonLayer.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [60, 60] });
+      }
+    }
+
+    // Toggle collapsible municipality card
+    function toggleMuniCard() {
+      const card = document.getElementById('muni-stats-card');
+      if (card) {
+        card.classList.toggle('collapsed');
+      }
+    }
+
+    // Zoom map to municipality streets on click
+    function zoomToMunicipality(muniName) {
+      if (!window.STREETS_DATA || !geojsonLayer) return;
+      const targetBounds = L.latLngBounds([]);
+      geojsonLayer.eachLayer(layer => {
+        const props = layer.feature ? layer.feature.properties : null;
+        if (props) {
+          const city = props.folder || props.municipality || '';
+          if (city.includes(muniName) || muniName.includes(city)) {
+            if (layer.getBounds) {
+              targetBounds.extend(layer.getBounds());
+            }
+          }
+        }
+      });
+      if (targetBounds.isValid()) {
+        map.fitBounds(targetBounds, { padding: [50, 50] });
+      }
+    }
+
+    // Populate municipality statistics list
+    function buildMunicipalityList() {
+      const container = document.getElementById('muni-list-container');
+      if (!container || !window.STREETS_DATA || !window.STREETS_DATA.features) return;
+
+      const counts = {};
+      window.STREETS_DATA.features.forEach(f => {
+        const muni = f.properties.folder || f.properties.municipality || 'أخرى';
+        counts[muni] = (counts[muni] || 0) + 1;
+      });
+
+      const munis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+
+      container.innerHTML = munis.map(m => {
+        const theme = getCityTheme(m);
+        return `
+          <div class="muni-item" onclick="zoomToMunicipality('${m}')" title="انقر للتكبير على شوارع ${theme.name}">
+            <div class="muni-item-name">
+              <span class="muni-item-dot" style="background: ${theme.color};"></span>
+              <span>${theme.name}</span>
+            </div>
+            <span class="muni-item-count" style="border: 1px solid ${theme.color}50;">${counts[m]} شوارع</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Create building icon with vector building symbol and status color
+    function createBuildingIcon(building) {
+      const status = (building.visitStatus === 'غير ممتثل' || !building.visitStatus) ? 'إنذار' : building.visitStatus;
+      let statusClass = 'pin-status-non-compliant';
+      if (status === 'ممتثل') statusClass = 'pin-status-compliant';
+      else if (status === 'قيد المعالجة') statusClass = 'pin-status-in-progress';
+
+      return L.divIcon({
+        className: 'building-div-icon',
+        html: `
+          <div class="building-pin-card ${statusClass}">
+            <div class="building-pin-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                <line x1="9" y1="6" x2="9.01" y2="6"></line>
+                <line x1="15" y1="6" x2="15.01" y2="6"></line>
+                <line x1="9" y1="10" x2="9.01" y2="10"></line>
+                <line x1="15" y1="10" x2="15.01" y2="10"></line>
+                <line x1="9" y1="14" x2="9.01" y2="14"></line>
+                <line x1="15" y1="14" x2="15.01" y2="14"></line>
+                <line x1="9" y1="18" x2="15" y2="18"></line>
+              </svg>
+            </div>
+            <span class="building-pin-badge">${building.number || building.id}</span>
+          </div>
+        `,
+        iconSize: [60, 32],
+        iconAnchor: [30, 16],
+        popupAnchor: [0, -18]
+      });
+    }
+
+    // Function to retrieve buildings dynamically (from localStorage or buildings.js)
+    function getActiveBuildings() {
+      const baseBuildings = (window.BUILDINGS_DATA && window.BUILDINGS_DATA.length > 0)
+        ? JSON.parse(JSON.stringify(window.BUILDINGS_DATA))
+        : [];
+
+      let data = [];
+      try {
+        const local = localStorage.getItem('platmon_buildings_override');
+        if (local) {
+          data = JSON.parse(local);
+        }
+      } catch (e) {
+        data = [];
+      }
+
+      let deletedIds = [];
+      try {
+        const storedDel = localStorage.getItem('platmon_deleted_ids');
+        if (storedDel) deletedIds = JSON.parse(storedDel);
+      } catch (e) {}
+
+      if (Array.isArray(data) && data.length > 0) {
+        // Smart Merge: start with stored (user additions + edits)
+        const merged = [...data];
+        const existingIds = new Set(data.map(b => String(b.number || b.id)));
+
+        // Add any base buildings that were not stored or deleted
+        baseBuildings.forEach(b => {
+          const idStr = String(b.number || b.id);
+          if (!existingIds.has(idStr) && !deletedIds.includes(idStr)) {
+            merged.push(b);
+          }
+        });
+        data = merged;
+      } else {
+        data = baseBuildings.filter(b => !deletedIds.includes(String(b.number || b.id)));
+      }
+
+      data.forEach(b => {
+        if (!b.visitStatus || b.visitStatus === 'غير ممتثل') {
+          b.visitStatus = 'إنذار';
+        }
+        if (b.licenseNumber && b.licenseNumber.startsWith('44100')) {
+          b.licenseNumber = '';
+        }
+      });
+      return data;
+    }
+
+    let currentFilter = 'all';
+
+    // Switch before/after photo inside popup
+    window.switchBldgPhoto = function(bldgId, type) {
+      const bldgs = getActiveBuildings();
+      const b = bldgs.find(item => String(item.id || item.number) === String(bldgId));
+      if (!b) return;
+
+      const imgEl = document.getElementById(`popup-img-${bldgId}`);
+      const btnBefore = document.getElementById(`tab-before-${bldgId}`);
+      const btnAfter = document.getElementById(`tab-after-${bldgId}`);
+
+      if (type === 'after') {
+        imgEl.src = b.imageAfter || b.imageBefore || b.image;
+        if (btnAfter) btnAfter.classList.add('active');
+        if (btnBefore) btnBefore.classList.remove('active');
+      } else {
+        imgEl.src = b.imageBefore || b.image;
+        if (btnBefore) btnBefore.classList.add('active');
+        if (btnAfter) btnAfter.classList.remove('active');
+      }
+    };
+
+    // Render buildings on map with status & before/after comparison
+    function renderBuildingsOnMap(filter = 'all') {
+      currentFilter = filter;
+      buildingsLayer.clearLayers();
+
+      const allBuildings = getActiveBuildings();
+
+      // Compute KPIs
+      let compliantCount = 0;
+      let inProgressCount = 0;
+      let nonCompliantCount = 0;
+
+      allBuildings.forEach(b => {
+        const st = (b.visitStatus === 'غير ممتثل' || !b.visitStatus) ? 'إنذار' : b.visitStatus;
+        if (st === 'ممتثل') compliantCount++;
+        else if (st === 'قيد المعالجة') inProgressCount++;
+        else nonCompliantCount++;
+      });
+
+      // Update KPI Badge Displays
+      const elTotal = document.getElementById('kpi-total-val');
+      const elComp = document.getElementById('kpi-compliant-val');
+      const elProg = document.getElementById('kpi-in-progress-val');
+      const elNon = document.getElementById('kpi-non-compliant-val');
+
+      if (elTotal) elTotal.textContent = allBuildings.length;
+      if (elComp) elComp.textContent = `${compliantCount} (${allBuildings.length > 0 ? Math.round((compliantCount / allBuildings.length) * 100) : 0}%)`;
+      if (elProg) elProg.textContent = inProgressCount;
+      if (elNon) elNon.textContent = nonCompliantCount;
+
+      // Filtered items
+      const toRender = allBuildings.filter(b => {
+        if (filter === 'all') return true;
+        const st = (b.visitStatus === 'غير ممتثل' || !b.visitStatus) ? 'إنذار' : b.visitStatus;
+        return st === filter;
+      });
+
+      toRender.forEach(b => {
+        if (!b.lat || !b.lng) return;
+
+        const marker = L.marker([b.lat, b.lng], {
+          icon: createBuildingIcon(b),
+          zIndexOffset: 1200
+        });
+
+        const status = (b.visitStatus === 'غير ممتثل' || !b.visitStatus) ? 'إنذار' : b.visitStatus;
+
+        marker.bindTooltip(`مبنى رقم ${b.number || b.id} - ${b.district || 'أبها'} (${status})`, {
+          sticky: true,
+          className: 'modern-street-tooltip'
+        });
+
+        let statusBadgeColor = '#ef4444';
+        let statusBadgeBg = 'rgba(239, 68, 68, 0.2)';
+        if (status === 'ممتثل') {
+          statusBadgeColor = '#10b981';
+          statusBadgeBg = 'rgba(16, 185, 129, 0.2)';
+        } else if (status === 'قيد المعالجة') {
+          statusBadgeColor = '#f59e0b';
+          statusBadgeBg = 'rgba(245, 158, 11, 0.2)';
+        }
+
+        const bldgId = String(b.number || b.id);
+        const hasAfter = Boolean(b.imageAfter);
+        const initialImg = b.imageBefore || b.image || (hasAfter ? b.imageAfter : '');
+
+        // Photo toggle buttons if after photo exists
+        const photoToggleHtml = hasAfter ? `
+          <div class="bldg-photo-tabs">
+            <button type="button" class="bldg-photo-tab active" id="tab-before-${bldgId}" onclick="switchBldgPhoto('${bldgId}', 'before')">📷 قبل التعديل</button>
+            <button type="button" class="bldg-photo-tab" id="tab-after-${bldgId}" onclick="switchBldgPhoto('${bldgId}', 'after')">✨ بعد الامتثال</button>
+          </div>
+        ` : '';
+
+        const popupHtml = `
+          <div class="popup-header">
+            <div class="popup-title" style="display:flex;align-items:center;gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${statusBadgeColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                <line x1="9" y1="6" x2="9.01" y2="6"></line>
+                <line x1="15" y1="6" x2="15.01" y2="15"></line>
+                <line x1="9" y1="10" x2="9.01" y2="10"></line>
+                <line x1="15" y1="10" x2="15.01" y2="10"></line>
+                <line x1="9" y1="14" x2="9.01" y2="14"></line>
+                <line x1="15" y1="14" x2="15.01" y2="14"></line>
+                <line x1="9" y1="18" x2="15" y2="18"></line>
+              </svg>
+              مبنى رقم ${b.number || b.id}
+            </div>
+            <span class="city-badge" style="color: ${statusBadgeColor}; background: ${statusBadgeBg}; border-color: ${statusBadgeColor};">
+              ${status}
+            </span>
+          </div>
+
+          ${photoToggleHtml}
+
+          <div class="building-popup-img-wrap" onclick="window.open(document.getElementById('popup-img-${bldgId}').src, '_blank')" title="تكبير الصورة">
+            <img src="${initialImg}" id="popup-img-${bldgId}" alt="مبنى ${b.number || b.id}" class="building-popup-img" />
+            <div class="building-zoom-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </div>
+          </div>
+
+          <div class="popup-body" style="margin-top: 10px;">
+            <div class="popup-row">
+              <span class="label">مالك المبنى / الممثل:</span>
+              <span class="value">${b.owner || '-'}</span>
+            </div>
+            <div class="popup-row">
+              <span class="label">رقم الجوال:</span>
+              <a href="tel:${b.phone}" class="phone-badge-link" dir="ltr">${b.phone || '-'}</a>
+            </div>
+            ${b.licenseNumber ? `
+            <div class="popup-row">
+              <span class="label">رقم ونوع الرخصة:</span>
+              <span class="value" dir="ltr">${b.licenseNumber} (${b.licenseType || 'تجاري'})</span>
+            </div>` : ''}
+            <div class="popup-row">
+              <span class="label">الإحداثيات:</span>
+              <span class="value" dir="ltr" style="font-size:0.8rem;">${b.lat}, ${b.lng}</span>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupHtml, {
+          maxWidth: 320,
+          className: 'building-custom-popup'
+        });
+
+        buildingsLayer.addLayer(marker);
+      });
+    }
+
+    // Filter buildings map view by status
+    window.filterBuildingsMap = function(status) {
+      ['all', 'compliant', 'in-progress', 'non-compliant'].forEach(id => {
+        const el = document.getElementById(`filter-${id}`);
+        if (el) el.classList.remove('active');
+      });
+
+      if (status === 'all') document.getElementById('filter-all').classList.add('active');
+      else if (status === 'ممتثل') document.getElementById('filter-compliant').classList.add('active');
+      else if (status === 'قيد المعالجة') document.getElementById('filter-in-progress').classList.add('active');
+      else if (status === 'إنذار' || status === 'غير ممتثل') document.getElementById('filter-non-compliant').classList.add('active');
+
+      renderBuildingsOnMap(status === 'غير ممتثل' ? 'إنذار' : status);
+    };
+
+    // Initial render of buildings
+    renderBuildingsOnMap('all');
+  </script>
+</body>
+
+</html>
