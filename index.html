@@ -1,0 +1,2042 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>امتثال المباني في مشاريع تحسين الطرق ذات الأولوية</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Google Fonts: Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body,
+    html {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #090d16;
+      color: #f8fafc;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+      background: #090d16;
+    }
+
+    /* Translucent Frosted Gray Glass Badge */
+    .map-badge {
+      position: absolute;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 18px;
+      padding: 14px 26px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      pointer-events: auto;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .map-badge:hover {
+      background: rgba(30, 41, 59, 0.88);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateX(-50%) translateY(-2px);
+    }
+
+    .map-badge h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff !important;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+    }
+
+    .map-badge p {
+      font-size: 0.85rem;
+      color: #ffffff !important;
+      margin-top: 4px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      opacity: 0.95;
+    }
+
+    .map-badge p span.dot {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Inspectors Quick Access Bar */
+    .inspectors-quick-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .insp-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      font-family: 'Cairo', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .insp-pill:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      background: rgba(30, 41, 59, 0.95);
+    }
+
+    .insp-pill-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .insp-pill-count {
+      background: rgba(255, 255, 255, 0.16);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    /* Clean, Eye-friendly Road Paths */
+    path.leaflet-interactive {
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      cursor: pointer;
+      transition: stroke-width 0.2s ease, stroke-opacity 0.2s ease;
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+    }
+
+    path.leaflet-interactive:hover {
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.95)) !important;
+      stroke-opacity: 1 !important;
+    }
+
+    /* White terminal line cap (خط أبيض لبداية ونهاية الشارع) */
+    .terminal-line-icon {
+      background: transparent !important;
+      border: none !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .white-terminal-bar {
+      width: 15px;
+      height: 3px;
+      background-color: #ffffff;
+      border-radius: 2px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 1px rgba(0, 0, 0, 0.8);
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .terminal-line-icon:hover .white-terminal-bar {
+      background-color: #f8fafc;
+      transform: scale(1.3) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 1), 0 0 4px #ffffff !important;
+    }
+
+    /* Modern Hover Floating Tooltip */
+    .modern-street-tooltip {
+      background: rgba(30, 41, 59, 0.78) !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+      border-radius: 12px !important;
+      color: #ffffff !important;
+      font-family: 'Cairo', sans-serif !important;
+      font-size: 0.88rem !important;
+      font-weight: 700 !important;
+      padding: 6px 14px !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+      direction: rtl !important;
+    }
+
+    .modern-street-tooltip::before {
+      display: none !important;
+    }
+
+    /* Custom Leaflet Popup Styling (Translucent Frosted Gray Glass) */
+    .leaflet-popup-content-wrapper {
+      background: rgba(30, 41, 59, 0.75) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      border-radius: 20px !important;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+      font-family: 'Cairo', sans-serif !important;
+      direction: rtl !important;
+      padding: 6px !important;
+      color: #ffffff !important;
+    }
+
+    .leaflet-popup-tip {
+      background: rgba(30, 41, 59, 0.75) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    }
+
+    .leaflet-popup-content {
+      margin: 14px 18px !important;
+      line-height: 1.5;
+    }
+
+    .popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .popup-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff !important;
+      line-height: 1.3;
+    }
+
+    .city-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      white-space: nowrap;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff !important;
+    }
+
+    /* Prominent Street Length Highlight Box */
+    .length-metric-card {
+      margin: 10px 0 12px 0;
+      padding: 10px 14px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      background: rgba(30, 41, 59, 0.65) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .length-metric-label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #ffffff !important;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .length-metric-value {
+      font-size: 1.18rem;
+      font-weight: 800;
+      letter-spacing: -0.2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .popup-body {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .popup-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 0.88rem;
+    }
+
+    .popup-row span.label {
+      color: #ffffff !important;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+
+    .popup-row span.value {
+      font-weight: 700;
+      color: #ffffff !important;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Inspectors section inside popup */
+    .inspectors-section {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .inspectors-title {
+      font-size: 0.84rem;
+      color: #ffffff !important;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .inspectors-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .inspector-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(30, 41, 59, 0.6) !important;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      color: #ffffff !important;
+      font-weight: 700;
+    }
+
+    .inspector-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.74rem;
+      color: #ffffff !important;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .leaflet-container a.leaflet-popup-close-button {
+      color: #ffffff !important;
+      padding: 8px !important;
+      top: 8px !important;
+      left: 8px !important;
+      right: auto !important;
+      opacity: 0.85;
+    }
+
+    .leaflet-container a.leaflet-popup-close-button:hover {
+      color: #ffffff !important;
+      opacity: 1;
+    }
+
+    /* Dark Modern Controls (Translucent Gray Glass) */
+    .leaflet-control-zoom {
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+      border-radius: 14px !important;
+      overflow: hidden;
+      background: transparent !important;
+    }
+
+    .leaflet-control-zoom a {
+      background-color: rgba(30, 41, 59, 0.75) !important;
+      backdrop-filter: blur(14px) !important;
+      -webkit-backdrop-filter: blur(14px) !important;
+      color: #ffffff !important;
+      border: none !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+      transition: all 0.2s ease;
+    }
+
+    .leaflet-control-zoom a:hover {
+      background-color: rgba(30, 41, 59, 0.9) !important;
+      color: #ffffff !important;
+    }
+
+    .leaflet-control-layers {
+      background: rgba(30, 41, 59, 0.75) !important;
+      backdrop-filter: blur(16px) !important;
+      -webkit-backdrop-filter: blur(16px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.16) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45) !important;
+      color: #ffffff !important;
+      font-family: 'Cairo', sans-serif !important;
+      padding: 10px 14px !important;
+      font-size: 0.86rem !important;
+    }
+
+    .leaflet-control-layers-toggle {
+      filter: invert(1) brightness(1.5);
+    }
+
+    /* Building Marker Pin Styles */
+    .building-div-icon {
+      background: transparent !important;
+      border: none !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .building-pin-card {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1.5px solid #00843D;
+      border-radius: 10px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 132, 61, 0.35);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .building-pin-card:hover {
+      transform: scale(1.12);
+      background: rgba(30, 41, 59, 0.95);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 132, 61, 0.6);
+      border-color: #ffffff;
+    }
+
+    .building-pin-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    .building-pin-badge {
+      background: #00843D;
+      color: #ffffff !important;
+      font-size: 0.78rem;
+      font-weight: 800;
+      border-radius: 6px;
+      padding: 1px 6px;
+      line-height: 1.3;
+      letter-spacing: -0.2px;
+    }
+
+    /* Building Popup Image & Actions Styles */
+    .building-popup-img-wrap {
+      position: relative;
+      width: 100%;
+      height: 170px;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      background: #090d16;
+    }
+
+    .building-popup-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.3s ease, filter 0.3s ease;
+    }
+
+    .building-popup-img-wrap:hover .building-popup-img {
+      transform: scale(1.05);
+      filter: brightness(0.9);
+    }
+
+    .building-zoom-btn {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+      pointer-events: none;
+    }
+
+    .building-popup-img-wrap:hover .building-zoom-btn {
+      background: #00843D;
+      border-color: #ffffff;
+      transform: scale(1.1);
+    }
+
+    .phone-badge-link {
+      background: rgba(0, 132, 61, 0.25);
+      color: #ffffff !important;
+      border: 1px solid #00843D;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 0.86rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .phone-badge-link:hover {
+      background: #00843D;
+      color: #ffffff !important;
+      box-shadow: 0 0 10px rgba(0, 132, 61, 0.5);
+    }
+
+    .google-maps-btn {
+      display: block;
+      text-align: center;
+      margin-top: 12px;
+      background: rgba(104, 59, 137, 0.3);
+      border: 1px solid #683B89;
+      color: #ffffff !important;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.84rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+
+    /* Collapsible Municipalities Card */
+    .muni-card {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 1000;
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      width: 260px;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: 'Cairo', sans-serif;
+      direction: rtl;
+    }
+
+    .muni-card-header {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(30, 41, 59, 0.5);
+      transition: background 0.2s ease;
+    }
+
+    .muni-card-header:hover {
+      background: rgba(30, 41, 59, 0.85);
+    }
+
+    .muni-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .muni-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .muni-total-badge {
+      background: rgba(0, 132, 61, 0.3);
+      border: 1px solid #00843D;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .muni-chevron-icon {
+      transition: transform 0.3s ease;
+    }
+
+    .muni-card.collapsed .muni-chevron-icon {
+      transform: rotate(180deg);
+    }
+
+    .muni-card-body {
+      max-height: 400px;
+      opacity: 1;
+      transition: max-height 0.35s ease, opacity 0.3s ease, padding 0.35s ease;
+      padding: 10px 14px 14px 14px;
+    }
+
+    .muni-card.collapsed .muni-card-body {
+      max-height: 0;
+      opacity: 0;
+      padding: 0 14px;
+      pointer-events: none;
+    }
+
+    .muni-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .muni-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 7px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .muni-item:hover {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateX(-3px);
+    }
+
+    .muni-item-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .muni-item-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .muni-item-count {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.12);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Minimal floating title badge -->
+  <div class="map-badge" id="map-info-badge">
+    <h1>امتثال المباني في مشاريع تحسين الطرق ذات الأولوية</h1>
+    <p id="total-streets-text">منطقة عسير</p>
+    <div class="inspectors-quick-bar">
+      <button type="button" class="insp-pill" onclick="zoomToInspector('سعد عبيد')" title="اضغط للانتقال لمباني سعد عبيد">
+        <span class="insp-pill-dot" style="background:#00843D;"></span>
+        <span>سعد عبيد</span>
+        <span class="insp-pill-count" id="count-saad">0</span>
+      </button>
+      <button type="button" class="insp-pill" onclick="zoomToInspector('نايف مدشوش')" title="اضغط للانتقال لمباني نايف مدشوش">
+        <span class="insp-pill-dot" style="background:#8b5cf6;"></span>
+        <span>نايف مدشوش</span>
+        <span class="insp-pill-count" id="count-naif">0</span>
+      </button>
+      <button type="button" class="insp-pill" onclick="zoomToInspector('محمد مغرم')" title="اضغط للانتقال لمباني محمد مغرم">
+        <span class="insp-pill-dot" style="background:#0284c7;"></span>
+        <span>محمد مغرم</span>
+        <span class="insp-pill-count" id="count-mohammed">0</span>
+      </button>
+      <button type="button" class="insp-pill" onclick="zoomToInspector('عبدالله دحمان')" title="اضغط للانتقال لمباني عبدالله دحمان" style="border-color: rgba(249,115,22,0.6); background: rgba(249,115,22,0.15);">
+        <span class="insp-pill-dot" style="background:#f97316;"></span>
+        <span style="color:#fdba74;">عبدالله دحمان</span>
+        <span class="insp-pill-count" id="count-dahman" style="background:rgba(249,115,22,0.35); color:#ffffff;">0</span>
+      </button>
+      <button type="button" class="insp-pill" onclick="zoomToInspector('طلال عبدالله')" title="اضغط للانتقال لمباني طلال عبدالله" style="border-color: rgba(225,29,72,0.6); background: rgba(225,29,72,0.15);">
+        <span class="insp-pill-dot" style="background:#e11d48;"></span>
+        <span style="color:#fda4af;">طلال عبدالله</span>
+        <span class="insp-pill-count" id="count-talal" style="background:rgba(225,29,72,0.35); color:#ffffff;">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Map container -->
+  <div id="map"></div>
+
+  <!-- Street GeoJSON Data -->
+  <script src="streets.js"></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // Initialize map
+    const map = L.map('map', {
+      zoomControl: true,
+      attributionControl: true
+    }).setView([18.22, 42.50], 12);
+
+    // Base layers
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Satellite place labels & boundaries overlay
+    const satelliteLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // Standard street basemap option
+    const osmStreet = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    });
+
+    // Terminal markers layer group
+    const terminalsLayer = L.layerGroup().addTo(map);
+
+    // Google Drive (Google Form / Sheet) buildings layer group
+    const driveBuildingsLayer = L.layerGroup().addTo(map);
+
+    // Google Drive - Naif Madshoosh buildings layer group
+    const naifBuildingsLayer = L.layerGroup().addTo(map);
+
+    // Google Drive - Mohammed Mogram buildings layer group
+    const mohammedBuildingsLayer = L.layerGroup().addTo(map);
+
+    // Google Drive - Abdullah Dahman buildings layer group
+    const dahmanBuildingsLayer = L.layerGroup().addTo(map);
+
+    // Google Drive - Talal Abdullah buildings layer group
+    const talalBuildingsLayer = L.layerGroup().addTo(map);
+
+    // Local buildings and facilities layer group
+    const buildingsLayer = L.layerGroup().addTo(map);
+
+    // Layer switcher control (top-left)
+    L.control.layers({
+      'قمر صناعي (ستالايت)': satellite,
+      'خريطة شوارع': osmStreet
+    }, {
+      'أسماء الأماكن والحدود': satelliteLabels,
+      'خطوط بداية ونهاية الشوارع': terminalsLayer,
+      '<span style="color:#6ee7b7;font-weight:700;">🟢 مباني سعد عبيد</span>': driveBuildingsLayer,
+      '<span style="color:#c4b5fd;font-weight:700;">🟣 مباني نايف مدشوش</span>': naifBuildingsLayer,
+      '<span style="color:#7dd3fc;font-weight:700;">🔵 مباني محمد مغرم</span>': mohammedBuildingsLayer,
+      '<span style="color:#fdba74;font-weight:700;">🟠 مباني عبدالله دحمان</span>': dahmanBuildingsLayer,
+      '<span style="color:#fda4af;font-weight:700;">🔴 مباني طلال عبدالله</span>': talalBuildingsLayer,
+      'مباني طريق الأمير سلطان': buildingsLayer
+    }, { position: 'topleft' }).addTo(map);
+
+    // Calculate perpendicular angle for terminal white lines
+    function getTerminalAngle(pt, allLines) {
+      if (!allLines || allLines.length === 0) return 0;
+      for (const line of allLines) {
+        if (!line || line.length < 2) continue;
+        const first = line[0];
+        const last = line[line.length - 1];
+
+        const dFirst = Math.hypot(first[0] - pt[0], first[1] - pt[1]);
+        if (dFirst < 0.0001) {
+          const dx = (line[1][0] - first[0]) * Math.cos(first[1] * Math.PI / 180);
+          const dy = -(line[1][1] - first[1]);
+          return Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        }
+
+        const dLast = Math.hypot(last[0] - pt[0], last[1] - pt[1]);
+        if (dLast < 0.0001) {
+          const prev = line[line.length - 2];
+          const dx = (last[0] - prev[0]) * Math.cos(last[1] * Math.PI / 180);
+          const dy = -(last[1] - prev[1]);
+          return Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        }
+      }
+      return 0;
+    }
+
+    // Create perpendicular white bar marker icon
+    function createWhiteLineIcon(angleDeg) {
+      return L.divIcon({
+        className: 'terminal-line-icon',
+        html: `<div class="white-terminal-bar" style="transform: rotate(${Math.round(angleDeg)}deg);"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+    }
+
+    // Authorized Saudi National Theme Palette (Saudi Flag Green & Royal Saudi Lavender)
+    function getCityTheme(city) {
+      // Saudi Flag Green: #00843D
+      // Royal Saudi Lavender: #683B89
+      if (!city) return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: 'غير محدد' };
+      if (city.includes('أبها')) {
+        return { color: '#00843D', bg: 'rgba(0, 132, 61, 0.25)', name: 'أبها' }; // Saudi Flag Green
+      }
+      if (city.includes('خميس مشيط')) {
+        return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: 'خميس مشيط' }; // Royal Saudi Lavender
+      }
+      if (city.includes('بيشة')) {
+        return { color: '#00843D', bg: 'rgba(0, 132, 61, 0.25)', name: 'بيشة' }; // Saudi Flag Green
+      }
+      if (city.includes('محايل')) {
+        return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: 'محايل عسير' }; // Royal Saudi Lavender
+      }
+      if (city.includes('أحد رفيدة')) {
+        return { color: '#00843D', bg: 'rgba(0, 132, 61, 0.25)', name: 'أحد رفيدة' }; // Saudi Flag Green
+      }
+      return { color: '#683B89', bg: 'rgba(104, 59, 137, 0.25)', name: city };
+    }
+
+    // Calculate path distance strictly unified in kilometers (كم)
+    function calculateLengthKm(coordinates) {
+      if (!coordinates || coordinates.length < 2) return '0.00 كم';
+      let totalMeters = 0;
+      for (let i = 0; i < coordinates.length - 1; i++) {
+        const pt1 = L.latLng(coordinates[i][1], coordinates[i][0]);
+        const pt2 = L.latLng(coordinates[i + 1][1], coordinates[i + 1][0]);
+        totalMeters += pt1.distanceTo(pt2);
+      }
+      return (totalMeters / 1000).toFixed(2) + ' كم';
+    }
+
+    let geojsonLayer;
+
+    if (window.STREETS_DATA) {
+      geojsonLayer = L.geoJSON(window.STREETS_DATA, {
+        style: function (feature) {
+          const city = feature.properties.folder || feature.properties.municipality || '';
+          const theme = getCityTheme(city);
+          return {
+            color: theme.color,
+            weight: 3.5,
+            opacity: 0.88,
+            lineCap: 'round',
+            lineJoin: 'round'
+          };
+        },
+        onEachFeature: function (feature, layer) {
+          const props = feature.properties || {};
+          const streetName = props.name || 'شارع بدون اسم';
+          const cityRaw = props.folder || props.municipality || 'غير محدد';
+          const theme = getCityTheme(cityRaw);
+          const id = props.unique_id || '-';
+
+          // Unified length from merged data
+          const lengthStr = props.total_length || '0.00 كم';
+
+          // Sleek Tooltip on Hover showing name and length
+          layer.bindTooltip(`
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${theme.color};margin-left:6px;border:1px solid #ffffff;"></span>
+            <strong style="color: #ffffff;">${streetName}</strong>
+            <span style="color: #ffffff; margin-right: 6px; font-weight: 700; opacity: 0.95;">(${lengthStr})</span>
+          `, {
+            sticky: true,
+            className: 'modern-street-tooltip'
+          });
+
+          // Modern Glassmorphism Popup on Click
+          const popupContent = `
+            <div class="popup-header">
+              <div class="popup-title">${streetName}</div>
+              <span class="city-badge" style="color: #ffffff; background: ${theme.bg}; border-color: ${theme.color};">
+                ${theme.name}
+              </span>
+            </div>
+
+            <!-- Prominent Street Length Box -->
+            <div class="length-metric-card" style="background: rgba(30, 41, 59, 0.65); border: 1px solid ${theme.color}60;">
+              <div class="length-metric-label">
+                <span>طول الشارع</span>
+              </div>
+              <div class="length-metric-value" style="color: #ffffff;">
+                ${lengthStr}
+              </div>
+            </div>
+
+            <div class="popup-body">
+              <div class="popup-row">
+                <span class="label">البلدية:</span>
+                <span class="value">${props.municipality || theme.name}</span>
+              </div>
+              ${id !== '-' ? `
+              <div class="popup-row">
+                <span class="label">المعرف:</span>
+                <span class="value">#${id}</span>
+              </div>` : ''}
+            </div>
+          `;
+          layer.bindPopup(popupContent);
+
+          // Add Start & End White Line Caps (خط أبيض متعامد لبداية ونهاية كل شارع)
+          if (props.start_coord && props.end_coord) {
+            const startPt = L.latLng(props.start_coord[1], props.start_coord[0]);
+            const endPt = L.latLng(props.end_coord[1], props.end_coord[0]);
+            const allLines = feature.geometry ? feature.geometry.coordinates : [];
+
+            const startAngle = getTerminalAngle(props.start_coord, allLines);
+            const endAngle = getTerminalAngle(props.end_coord, allLines);
+
+            // Start white line marker
+            const startMarker = L.marker(startPt, {
+              icon: createWhiteLineIcon(startAngle),
+              zIndexOffset: 1000
+            });
+            startMarker.bindTooltip(`بداية الشارع: ${streetName}`, {
+              sticky: true,
+              className: 'modern-street-tooltip'
+            });
+            startMarker.on('click', () => layer.openPopup());
+            terminalsLayer.addLayer(startMarker);
+
+            // End white line marker
+            const endMarker = L.marker(endPt, {
+              icon: createWhiteLineIcon(endAngle),
+              zIndexOffset: 1000
+            });
+            endMarker.bindTooltip(`نهاية الشارع: ${streetName}`, {
+              sticky: true,
+              className: 'modern-street-tooltip'
+            });
+            endMarker.on('click', () => layer.openPopup());
+            terminalsLayer.addLayer(endMarker);
+          }
+
+          // Smooth Hover Dynamics
+          layer.on({
+            mouseover: function (e) {
+              const l = e.target;
+              l.setStyle({
+                weight: 5.5,
+                opacity: 1
+              });
+              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                l.bringToFront();
+              }
+            },
+            mouseout: function (e) {
+              geojsonLayer.resetStyle(e.target);
+            }
+          });
+        }
+      }).addTo(map);
+
+      // Dynamically update total features counter in badge
+      const countEl = document.getElementById('total-streets-text');
+      if (countEl) {
+        countEl.innerHTML = `منطقة عسير`;
+      }
+
+      // Automatically adjust camera bounds to encompass all streets
+      const bounds = geojsonLayer.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [60, 60] });
+      }
+    }
+
+    // Create building icon with vector building symbol and badge number
+    function createBuildingIcon(building, color) {
+      const pinColor = color || '#00843D';
+      return L.divIcon({
+        className: 'building-div-icon',
+        html: `
+          <div class="building-pin-card" style="border-color: ${pinColor}; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6), 0 0 10px ${pinColor}66;">
+            <div class="building-pin-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${pinColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                <line x1="9" y1="6" x2="9.01" y2="6"></line>
+                <line x1="15" y1="6" x2="15.01" y2="6"></line>
+                <line x1="9" y1="10" x2="9.01" y2="10"></line>
+                <line x1="15" y1="10" x2="15.01" y2="10"></line>
+                <line x1="9" y1="14" x2="9.01" y2="14"></line>
+                <line x1="15" y1="14" x2="15.01" y2="14"></line>
+                <line x1="9" y1="18" x2="15" y2="18"></line>
+              </svg>
+            </div>
+            <span class="building-pin-badge" style="background: ${pinColor};">${building.number}</span>
+          </div>
+        `,
+        iconSize: [60, 32],
+        iconAnchor: [30, 16],
+        popupAnchor: [0, -18]
+      });
+    }
+
+    // Buildings and facilities dataset
+    const BUILDINGS_DATA = [
+      {
+        number: '13',
+        owner: 'سليمان بن عايض',
+        phone: '0507677115',
+        locationCode: '6G88+V2M، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.21721,
+        lng: 42.51504,
+        image: 'images/building_13.png'
+      },
+      {
+        number: '15',
+        owner: 'عبدالله العبيدي',
+        phone: '0508555972',
+        locationCode: '7832 الامير سلطان، 4957، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.21632,
+        lng: 42.51529,
+        image: 'images/building_15.png'
+      },
+      {
+        number: '16',
+        owner: 'ماجد عسيري',
+        phone: '0542252277',
+        locationCode: '7814 الامير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.21605,
+        lng: 42.51537,
+        image: 'images/building_16.png'
+      },
+      {
+        number: '17',
+        owner: 'ماجد عسيري',
+        phone: '0542252277',
+        locationCode: '6G88+775 حي، شارع المطاعم، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.21563,
+        lng: 42.51563,
+        image: 'images/building_17.png'
+      },
+      {
+        number: '18',
+        owner: 'ماجد عسيري',
+        phone: '0542252277',
+        locationCode: 'شارع الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.21535,
+        lng: 42.51582,
+        image: 'images/building_18.png'
+      },
+      {
+        number: '19',
+        owner: 'ماجد عسيري',
+        phone: '0542252277',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.215288,
+        lng: 42.515705,
+        image: 'images/building_19.png'
+      },
+      {
+        number: '20',
+        owner: 'محمد عبدالله بن نمشه',
+        phone: '0555748340',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.215089,
+        lng: 42.515748,
+        image: 'images/building_20.png'
+      },
+      {
+        number: '21',
+        owner: 'عبدالله بن نمشه',
+        phone: '0555748340',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.215857,
+        lng: 42.515236,
+        image: 'images/building_21.png'
+      },
+      {
+        number: '23',
+        owner: 'سعيد حميدي بن نمشه',
+        phone: '0505753136',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.214258,
+        lng: 42.515870,
+        image: 'images/building_23.png'
+      },
+      {
+        number: '24',
+        owner: 'محمد بن نمشه',
+        phone: '0505753136',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.213731,
+        lng: 42.515954,
+        image: 'images/building_24.png'
+      },
+      {
+        number: '25',
+        owner: 'علي الثميري',
+        phone: '0505754150',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.213480,
+        lng: 42.516010,
+        image: 'images/building_25.png'
+      },
+      {
+        number: '26',
+        owner: 'محمد بن نمشه',
+        phone: '0505753136',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.213407,
+        lng: 42.515799,
+        image: 'images/building_26.png'
+      },
+      {
+        number: '27',
+        owner: 'ماجد ابو ثامره',
+        phone: '0545223555',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.209886,
+        lng: 42.516431,
+        image: 'images/building_27.png'
+      },
+      {
+        number: '28',
+        owner: 'ياسر البشري',
+        phone: '0508819817',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.209672,
+        lng: 42.516439,
+        image: 'images/building_28.png'
+      },
+      {
+        number: '29',
+        owner: 'خالد',
+        phone: '0541722220',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.209449,
+        lng: 42.516511,
+        image: 'images/building_29.png'
+      },
+      {
+        number: '31',
+        owner: 'سعد الشرفي',
+        phone: '0557774050',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.208189,
+        lng: 42.516686,
+        image: 'images/building_31.png'
+      },
+      {
+        number: '32',
+        owner: 'عوض البشري',
+        phone: '0505752593',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.207698,
+        lng: 42.516970,
+        image: 'images/building_32.png'
+      },
+      {
+        number: '33',
+        owner: 'ياسر البشري',
+        phone: '0508819817',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.207232,
+        lng: 42.516797,
+        image: 'images/building_33.png'
+      },
+      {
+        number: '34',
+        owner: 'وكيل مباني العاذرية',
+        phone: '0577367309',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.206836,
+        lng: 42.516781,
+        image: 'images/building_34.png'
+      },
+      {
+        number: '35',
+        owner: 'عبدالعزيز الشهراني',
+        phone: '0536695403',
+        locationCode: 'طريق الأمير سلطان، النزهة، أبها 62521',
+        district: 'النزهة',
+        city: 'أبها',
+        lat: 18.205954,
+        lng: 42.516735,
+        image: 'images/building_35.png'
+      }
+    ];
+
+    // Render buildings on map
+    BUILDINGS_DATA.forEach(b => {
+      const marker = L.marker([b.lat, b.lng], {
+        icon: createBuildingIcon(b),
+        zIndexOffset: 1200
+      });
+
+      marker.bindTooltip(`مبنى رقم ${b.number} - ${b.district}`, {
+        sticky: true,
+        className: 'modern-street-tooltip'
+      });
+
+      const popupHtml = `
+        <div class="popup-header">
+          <div class="popup-title" style="display:flex;align-items:center;gap:8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00843D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+              <line x1="9" y1="6" x2="9.01" y2="6"></line>
+              <line x1="15" y1="6" x2="15.01" y2="15"></line>
+              <line x1="9" y1="10" x2="9.01" y2="10"></line>
+              <line x1="15" y1="10" x2="15.01" y2="10"></line>
+              <line x1="9" y1="14" x2="9.01" y2="14"></line>
+              <line x1="15" y1="14" x2="15.01" y2="14"></line>
+              <line x1="9" y1="18" x2="15" y2="18"></line>
+            </svg>
+            مبنى رقم ${b.number}
+          </div>
+          <span class="city-badge" style="color: #ffffff; background: rgba(0, 132, 61, 0.25); border-color: #00843D;">
+            ${b.district} - ${b.city}
+          </span>
+        </div>
+
+        <div class="building-popup-img-wrap" onclick="window.open('${b.image}', '_blank')" title="تكبير الصورة">
+          <img src="${b.image}" alt="مبنى ${b.number}" class="building-popup-img" />
+          <div class="building-zoom-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          </div>
+        </div>
+
+        <div class="popup-body" style="margin-top: 10px;">
+          <div class="popup-row">
+            <span class="label">مالك المبنى / الممثل:</span>
+            <span class="value">${b.owner}</span>
+          </div>
+          <div class="popup-row">
+            <span class="label">رقم الجوال:</span>
+            <a href="tel:${b.phone}" class="phone-badge-link" dir="ltr">${b.phone}</a>
+          </div>
+          <div class="popup-row">
+            <span class="label">العنوان الوطني:</span>
+            <span class="value" dir="ltr" style="font-size:0.82rem;">${b.locationCode}</span>
+          </div>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml, {
+        maxWidth: 320,
+        className: 'building-custom-popup'
+      });
+
+      buildingsLayer.addLayer(marker);
+    });
+
+    // =========================================================================
+    // Google Drive & Google Sheets Live Integration (Form Responses)
+    // Saad Obeid Sheet: https://docs.google.com/spreadsheets/d/104pGyUoT5XbTw1mQ7dsvHI1gEbnv5i20gmIJY2nO6OA
+    // Naif Madshoosh Sheet: https://docs.google.com/spreadsheets/d/1rdbXKvoWQofUQGt4cIFuuQhDoIprnWGGfiwtHvU_m3w
+    // Mohammed Mogram Sheet: https://docs.google.com/spreadsheets/d/1HyXA_RM32IAeEfqFHzhNJjRxn1kZWy--6WyFwOn5oOg
+    // Abdullah Dahman Sheet: https://docs.google.com/spreadsheets/d/1A4k2yQnJ2mk2e7vU4xISTsIiGvBVPfL_d7B9I4wSzSQ
+    // Talal Abdullah Sheet: https://docs.google.com/spreadsheets/d/1_PTbiptbNwVNJNn4ygxo0bKFo5brwvXfEpkQO6p04dw
+    // =========================================================================
+    const GOOGLE_SHEET_ID_SAAD = '104pGyUoT5XbTw1mQ7dsvHI1gEbnv5i20gmIJY2nO6OA';
+    const GOOGLE_SHEET_ID_NAIF = '1rdbXKvoWQofUQGt4cIFuuQhDoIprnWGGfiwtHvU_m3w';
+    const GOOGLE_SHEET_ID_MOHAMMED = '1HyXA_RM32IAeEfqFHzhNJjRxn1kZWy--6WyFwOn5oOg';
+    const GOOGLE_SHEET_ID_DAHMAN = '1A4k2yQnJ2mk2e7vU4xISTsIiGvBVPfL_d7B9I4wSzSQ';
+    const GOOGLE_SHEET_ID_TALAL = '1_PTbiptbNwVNJNn4ygxo0bKFo5brwvXfEpkQO6p04dw';
+
+    // Initial snapshot for Abdullah Dahman
+    const INITIAL_DAHMAN_ROWS = [
+      ["11:31:14 ص 2026/11/03", "بن ناجي", "0555757770", "مبنى تجاري", "https://drive.google.com/open?id=1JKVy30ZeiZYZudGHk86BU3rj4A7CzPEy", "18.237883994206697, 42.59431486755506"],
+      ["11:35:36 ص 2026/11/03", "علي الشهري", "0551020993", "مبنى تجاري", "https://drive.google.com/open?id=1mKZdE-M9REPXEOSQla8Xe33ys_lLelsi", "18.23806388398202, 42.5944749937256"],
+      ["11:44:36 ص 2026/11/03", "فيصل ال سلطان الدريس", "+966 53 648 4707", "مبنى تجاري", "https://drive.google.com/open?id=1bQRSubjH89B7vE_GrIqHEs8AKgNpQBDX", ""],
+      ["12:50:06 م 2026/11/03", "ابراهيم الشهراني", "0555496665", "مبنى تجاري", "https://drive.google.com/open?id=1Ylkeri1lqCU1eDqF_XYwTA1X7o7gZfJT", ""],
+      ["4:12:05 م 2026/11/03", "بن ناجي", "0555757770", "مبنى تجاري", "https://drive.google.com/open?id=16M5jbwFzBfzDskLJxLBFaxz_3FWXSVcp", "18.23897124440377, 42.59609580715638"],
+      ["4:57:37 م 2026/11/03", "ناصر حسين منير الشهراني", "0553745863", "مبنى تجاري", "https://drive.google.com/open?id=117QM9tsuM00cemZ5bbqD05xN61zZq8K3", "18.23959975100646, 42.59707184943509"],
+      ["5:36:08 م 2026/11/03", "جمال عسيري", "0533377656", "مبنى تجاري", "https://drive.google.com/open?id=1VPlPZiBrLGK5qqQzn9htOTntK5Z9gJNN", "18.240261890320554, 42.603931160133655"],
+      ["6:59:18 م 2026/11/03", "نواف الأطرم", "+966 56 666 4300", "مبنى تجاري", "https://drive.google.com/open?id=17WDrg6ug-63mk75V3bPTC1kc2JU32m_D", "18.24075958274447, 42.60724740935313"],
+      ["8:32:31 ص 2026/11/04", "سعد علي الغرابي", "0541357129", "مبنى تجاري", "https://drive.google.com/open?id=1VQn1lf5rwv-8h9jCzWnxhyI3z067TqYI", "18.23860486771917, 42.56902923852236"],
+      ["8:35:00 ص 2026/11/04", "ابو غيث", "0503742428", "مبنى تجاري", "https://drive.google.com/open?id=1-3z6bo-k6Y3ptdlpBtcwHV6gHNv3z-P8", "18.238985178759076, 42.56990101076019"],
+      ["8:38:11 ص 2026/11/04", "خالد بامطرف", "0532992547", "مبنى تجاري", "https://drive.google.com/open?id=1_ouvunVy6VlMGjYArY5iD33vp0UA34nH", ""],
+      ["8:49:49 ص 2026/11/04", "سلمان كشر", "0593366630", "مبنى تجاري", "https://drive.google.com/open?id=1FbchQ8DFy07S73Q3HeID8ZTDWMQ6udOZ", "18.239701356229787, 42.57258762200236"],
+      ["8:52:32 ص 2026/11/04", "الحسن الألمعي", "0557803087", "مبنى تجاري", "https://drive.google.com/open?id=1R01d8EZWe17jbCmM5c9d7sEsCO3Zn9df", "18.24055762080228, 42.574750388308665"],
+      ["8:56:36 ص 2026/11/04", "احمد عسيري", "0580706074", "مبنى تجاري", "https://drive.google.com/open?id=1cU8XqaxfmUZXs3A3iz1Zmmn5v3mwgoia", "18.236754027036007, 42.57949504375715"],
+      ["9:04:28 ص 2026/11/04", "فهد الشهري", "0556402609", "مبنى تجاري", "https://drive.google.com/open?id=1Fm3zyxAuCGUxBqJyqkny5Ba2_Ni0vd89", "18.237596256896534, 42.58221667932778"],
+      ["9:06:33 ص 2026/11/04", "سعد الشهراني", "0569692442", "مبنى تجاري", "https://drive.google.com/open?id=1aOoGDHKB-Bb57uEJ-YSw6Ac5AiTrhyPj", "18.237450478421582, 42.582504185036946"],
+      ["9:08:31 ص 2026/11/04", "سعد الشهراني", "0569692442", "مبنى تجاري", "https://drive.google.com/open?id=1meztIlyVKWIzLh5NR6EgFJj68-VlemsG", "18.237306267246183, 42.582702869590264"],
+      ["9:09:22 ص 2026/11/04", "احمد يتيمي", "0566554088", "مبنى تجاري", "", ""],
+      ["9:11:13 ص 2026/11/04", "احمد يتيمي", "0566554088", "مبنى تجاري", "https://drive.google.com/open?id=1tCENhk506nuldfgsw5RjYNtQXLlfSWF4", ""],
+      ["9:29:37 ص 2026/11/04", "المدير الطبي عدنان عسيري", "0507733227", "مبنى تجاري", "https://drive.google.com/open?id=1F0Zvjn6dRakMZUo29yoDityC8MAaYl2n", "18.23603960851181, 42.58491498632284"]
+    ];
+
+    // Initial snapshot for Talal Abdullah (Total records: 95, with coords: 95)
+    const INITIAL_TALAL_ROWS = [
+      ["12:06:52 م 2026/11/01", "عادل سعيد ال قصير (1)", "0555763438", "مبنى تجاري", "https://drive.google.com/open?id=18Ulzdxzt085Bgl1QcbxvzQSGmcv4O1JT", "18.309686, 42.594623"],
+      ["12:09:07 م 2026/11/01", "مقبره (2)", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1rgNvWZJ3f8gdVTVPuEfmKnILMQvz7cB1", "18.308340, 42.595342"],
+      ["12:45:09 م 2026/11/01", "غير معروف (3)", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1xpxnGhJSJV1Mbq4pUyL39sYGAh61DcGF", "18.307380, 42.595569"],
+      ["12:52:22 م 2026/11/01", "عبدالله صالح الاحمري", "0547888118", "مبنى تجاري", "https://drive.google.com/open?id=1avfA640SqJexpdg8kAgBk63DFutDv11X", "18.308301, 42.595326"],
+      ["12:56:35 م 2026/11/01", "غير معروف", "غير معروف", "ارض فضاء, مبنى تجاري", "https://drive.google.com/open?id=1QejOmRG6fuNESYW516A2oe5tW4GfuIib", "18.307003, 42.595631"],
+      ["12:57:37 م 2026/11/01", "غير معروف وتم وضع ملصقات", "غير معروف", "ارض فضاء, مبنى تجاري", "https://drive.google.com/open?id=1eyAWIl5kBgqeffcBh_IUxPJL7fpzNBXZ", "18.306405, 42.595798"],
+      ["1:01:35 م 2026/11/01", "غير معروف وتم وضع ملصق", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1ZmugkS1yW_ADn96LQx6zkg2cEBprjmZn", "18.306320, 42.595792"],
+      ["1:04:23 م 2026/11/01", "غير معروف وتم وضع ملصق", "غير معروف", "مبنى تجاري", "https://drive.google.com/open?id=15MEQzjd3FzWu4u7iRWN2LWy4hW1r3L5m", "18.306015, 42.595816"],
+      ["1:07:11 م 2026/11/01", "غير معروف وتم وضع ملصق", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1HHhv2v_jvV2TRYJbp0WyZn2G5xuPlM07", "18.304287, 42.595402"],
+      ["11:13:53 ص 2026/11/02", "غير معروف", "0595577727", "مبنى تجاري", "https://drive.google.com/open?id=1tu83r6jcjSctN4L0e2FUrW7tm-tgZ5ub", "18.303921, 42.595166"],
+      ["11:15:47 ص 2026/11/02", "غير معروف بيت سكني", "غير معروف", "مبنى تجاري", "https://drive.google.com/open?id=17O4B64Z4LyfLC5j9hBUnL8v-83W1B6IY", "18.303698, 42.595122"],
+      ["11:17:05 ص 2026/11/02", "غير معروف بيت سكني", "غير معروف", "مبنى تجاري", "https://drive.google.com/open?id=1qpHAa8GCX4rlwhrOqPKAYKKbNfRFaJMt", "18.303471, 42.594978"],
+      ["11:18:08 ص 2026/11/02", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1fZOXmkNP2G7gVwJWeBJz71tXM5khIj5X", "18.301065, 42.594384"],
+      ["11:38:04 ص 2026/11/02", "عبدالرحمن", "501180458", "مبنى تجاري", "https://drive.google.com/open?id=1AbSVM3-ThbJkyikQAO-GZR8AyDlAF0UK", "18.300852, 42.594300"],
+      ["11:39:41 ص 2026/11/02", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=17NFsROewbApiKqQhS-kWvCWO8lv0lk6G", "18.300506, 42.594252"],
+      ["11:40:49 ص 2026/11/02", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1xzKkhtdIaobPyuUAQw_f4dYVxHutUYDE", "18.299938, 42.594131"],
+      ["11:44:18 ص 2026/11/02", "شركة بيت الخيزران", "0507255888", "مبنى تجاري", "https://drive.google.com/open?id=1SGqoNbIcv-elePK2L79PT-g0Yyxtcie1", "18.299706, 42.594093"],
+      ["11:45:04 ص 2026/11/02", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1TsdOPtaT9hiij4CJjv2_i91ve3cqHCw5", "18.299706, 42.594093"],
+      ["11:46:48 ص 2026/11/02", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1CoBDdpxEWGZ-4on0SXdHg30S-EALeJiJ", "18.299359, 42.594012"],
+      ["11:49:56 ص 2026/11/02", "جابر", "‪+966 55 990 9898‬", "مبنى تجاري", "https://drive.google.com/open?id=1HwvR3ka3fvSlIXewYCVJoLGzNo_nUvRB", "18.299140, 42.593998"],
+      ["11:51:31 ص 2026/11/02", "مسفر عبدالله", "0505752887", "ارض فضاء", "https://drive.google.com/open?id=1nS_Qokyz_FHe9l9XHhQrkdPobpERlXdr", "18.298837, 42.593954"],
+      ["11:53:44 ص 2026/11/02", "عمر ال ناعم", "0566581855", "مبنى تجاري", "https://drive.google.com/open?id=1uzBwlKjikjQ0JcpA8fmZRec-ULTGCkfZ", "18.298526, 42.593921"],
+      ["11:56:17 ص 2026/11/02", "عبدالعزيز", "0505753910", "مبنى تجاري", "https://drive.google.com/open?id=1p-T68Se0kfh7aheL1YM4bN_htf0C9S6j", "18.298338, 42.593782"],
+      ["11:58:00 ص 2026/11/02", "سلمان هروبي", "0535483315", "مبنى تجاري", "https://drive.google.com/open?id=1Q7OQVyC1Gz4lWPdAz-z4BayvuCth2mR8", "18.297880, 42.593794"],
+      ["12:01:09 م 2026/11/02", "مبنى تجاري تحت الإنشاء ورقم الهاتف يتبع لمكتب تطوير عقاري", "0534108999", "مبنى تجاري", "https://drive.google.com/open?id=1yRlsXeH7tr4tQDkeif-s3XpefIemc0Dl", "18.297612, 42.593751"],
+      ["12:08:36 م 2026/11/02", "سلطان عبدالله ال منصور (تحت الإنشاء)", "‭054 584 4440‬", "مبنى تجاري", "https://drive.google.com/open?id=17M9tq_Z_AVD2tKhx7uFIGB1FIZ8p0OjI", "18.297022, 42.593544"],
+      ["12:10:07 م 2026/11/02", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1ECO2ep4kBWHi6XG6xRGkZ1y94_FDK1L3", "18.296026, 42.593531"],
+      ["12:11:44 م 2026/11/02", "غير معروف", "0536226665", "ارض فضاء", "https://drive.google.com/open?id=14Y2zJvLtDmkELn6XfoMf4hJip3eD1EeR", "18.295133, 42.593366"],
+      ["12:18:04 م 2026/11/02", "مانع محمد مانع عسيري", "0541834444", "مبنى تجاري", "https://drive.google.com/open?id=1FqagGLhwb9obyGZWivvmzlVdO__AbOgj", "18.293395, 42.592985"],
+      ["12:21:06 م 2026/11/02", "محمد مفرح محمد عسيري", "0504743128", "مبنى تجاري", "https://drive.google.com/open?id=15eT4QaOWHB0tsYbg9NHcXOfveAD_BHyc", "18.293334, 42.593381"],
+      ["12:23:00 م 2026/11/02", "حسن عبدالله حامد القحطاني", "0555653010", "مبنى تجاري", "https://drive.google.com/open?id=1Kmc9UrMnODLGPELlD6L2wIVLMFQbbpRM", "18.292995, 42.593438"],
+      ["12:29:45 م 2026/11/02", "نايف جبران مرعي ال عباس", "0504563477", "مبنى تجاري", "https://drive.google.com/open?id=1EtECc7YnW7rm8U7Zbqrt0ogyR45AGQQ9", "18.292886, 42.593416"],
+      ["12:32:07 م 2026/11/02", "خليفة ابن عيظه بالعبيد", "0599990460", "مبنى تجاري", "https://drive.google.com/open?id=1BrJthulXXLZ8u1YzIP88SwTtVF4_2tlh", "18.292714, 42.593424"],
+      ["12:34:36 م 2026/11/02", "ماجد عبدالعزيز  الشغرود", "0555755451", "مبنى تجاري", "https://drive.google.com/open?id=1pSaxGyxnnmxwblLvOtrx-OFNbamVh1rk", "18.292440, 42.593395"],
+      ["9:17:11 ص 2026/11/03", "شركة شروف للتجارة", "0535920202", "مبنى تجاري", "https://drive.google.com/open?id=1gJV1B1mXJKKhTyRqFoJXxxKxa-RA3xkQ", "18.291957, 42.593307"],
+      ["9:21:10 ص 2026/11/03", "عبدالهادي ناصر كومان", "0532220010", "مبنى تجاري", "https://drive.google.com/open?id=1zexYPXNXps8sWgNfy79yAZtdRjJxhZQN", "18.291736, 42.593406"],
+      ["9:25:32 ص 2026/11/03", "غير معروف", "غير معروف", "مبنى تجاري", "https://drive.google.com/open?id=14_IPH7Rc9af3yij8mW-3FKvbR2X1Lgfc", "18.291282, 42.593218"],
+      ["9:32:17 ص 2026/11/03", "علي عبدالعزيز ال حشر", "0533056343", "مبنى تجاري", "https://drive.google.com/open?id=191fOm84PfgVm5bkrltTlqsyuvvxFAycH", "18.290596, 42.593309"],
+      ["9:37:37 ص 2026/11/03", "سعيد احمد شفلوت", "555755877", "مبنى تجاري", "https://drive.google.com/open?id=1KEWFBUuoQQEjmpXxC8hD8qAIQLdpCye3", "18.289985, 42.593197"],
+      ["9:46:53 ص 2026/11/03", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1lwyeumKkmUHH1gzi2xxiAFldeFxsLm99", "18.289225, 42.592853"],
+      ["9:49:55 ص 2026/11/03", "عبدالله مشبب عسيري", "‭054 579 4554‬", "مبنى تجاري", "https://drive.google.com/open?id=1MQUxF9yb1oc-SI9puFxDBkrTbuvTfXsv", "18.288644, 42.593095"],
+      ["9:53:03 ص 2026/11/03", "نوف عبدالله ال منيع", "0503742550", "مبنى تجاري", "https://drive.google.com/open?id=1Ids3NgsP0N-A68OGuiCAJHkJwdwgYBKL", "18.288428, 42.592968"],
+      ["9:56:29 ص 2026/11/03", "حمود علي الشهري", "‭050 138 7177‬", "مبنى تجاري", "https://drive.google.com/open?id=13h_yaAH0Qlo_mNWyRwao5j_OH6NAXVTH", "18.288211, 42.592938"],
+      ["10:06:31 ص 2026/11/03", "راشد سعد عبدالله ال ناشع", "0505758005", "مبنى تجاري", "https://drive.google.com/open?id=1ymyqqK8z9GavikrwMY50p2EcnaTQFwDp", "18.287974, 42.592894"],
+      ["10:10:57 ص 2026/11/03", "ياسر عبدالله الاسمري", "0544542810", "مبنى تجاري", "https://drive.google.com/open?id=1peeeQeRJBecEWc6luFmwkmDv3r3pStly", "18.287130, 42.592839"],
+      ["10:16:00 ص 2026/11/03", "رياض علي العسيري", "0501732754", "مبنى تجاري", "https://drive.google.com/open?id=1s2sCDCyEz1vwDEbtfsmJJg9-92nOgMuC", "18.286948, 42.592749"],
+      ["10:24:13 ص 2026/11/03", "محمد عبدالله القرني (تحت الإنشاء", "‭055 575 0546‬", "مبنى تجاري", "https://drive.google.com/open?id=1QHCN4gsD0Q41g6nhvq2Msvk7KpNq_Aie", "18.286763, 42.592718"],
+      ["10:26:51 ص 2026/11/03", "ظافر عايض الشهري", "‭+966 55 576 3445‬", "ارض فضاء", "https://drive.google.com/open?id=1qmjVi11zFfJOLe73eq3_iIXSYFUuhE93", "18.286461, 42.592717"],
+      ["10:29:14 ص 2026/11/03", "محمد مبارك القحطاني", "0502088833", "مبنى تجاري", "https://drive.google.com/open?id=1ktsUg7KK6hWejyWbxSV3iDcZ_lH9SNgg", "18.286337, 42.592682"],
+      ["10:37:17 ص 2026/11/03", "علي محمد سارح هملان", "0505754702", "مبنى تجاري", "https://drive.google.com/open?id=1aFcNu430DdkI4C-PmsvxWfDNEejo1RCe", "18.286132, 42.592627"],
+      ["10:40:46 ص 2026/11/03", "فاطمة عبدالله هادي الاسمري", "0508716090", "مبنى تجاري", "https://drive.google.com/open?id=1fAZttx62sANW7ItG50k9GhxgciAKAZkT", "18.285931, 42.592638"],
+      ["10:45:37 ص 2026/11/03", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=16EwJmvCUyleHrfkfwzrqIkkYyl2L0n7O", "18.285931, 42.592638"],
+      ["10:49:54 ص 2026/11/03", "محمد سعد القحطاني", "0506108441", "مبنى تجاري", "https://drive.google.com/open?id=1oaizQ6KSy0q684sQ7wULYrenx8TYFd38", "18.285312, 42.592545"],
+      ["10:50:55 ص 2026/11/03", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1VFVj0qab_rqm_U12uiXxuIgxR1Bm14iN", "18.283738, 42.592936"],
+      ["10:53:08 ص 2026/11/03", "حمود علي الشهري", "0554742211", "مبنى تجاري", "https://drive.google.com/open?id=1bkrJk8d-Exq7t4HkeZ47EkfcAW2GZo3Y", "18.281074, 42.593181"],
+      ["10:55:29 ص 2026/11/03", "عبدالرحمن عبدالله ال محيا", "0561821912", "مبنى تجاري", "https://drive.google.com/open?id=1U8Pgt5hGr8ElIHHQ9bLr7EOfIN5M41lL", "18.280881, 42.593144"],
+      ["11:05:58 ص 2026/11/03", "سعيد القحطاني ابو عمر", "0555755765", "مبنى تجاري", "https://drive.google.com/open?id=18_-h20uSf9eexZyB4F31PxXlzzfAeEZG", "18.280672, 42.593152"],
+      ["11:12:44 ص 2026/11/03", "جارالله القحطاني", "0595616666", "مبنى تجاري", "https://drive.google.com/open?id=1E7vxFiQDQXAo3AosLTPlCpcc0h5VIpP7", "18.280518, 42.593093"],
+      ["11:16:35 ص 2026/11/03", "راشد", "0554013333", "مبنى تجاري", "https://drive.google.com/open?id=1T5aZMvVowBVZI40Pw5-LN1pZ6gwiDZtI", "18.280293, 42.593068"],
+      ["11:48:38 ص 2026/11/03", "شايع عزيز العمري", "0540308080", "مبنى تجاري", "https://drive.google.com/open?id=1pOWIrueVgcyvc1TrM6IOtiwfQDHP9ag9", "18.280164, 42.592990"],
+      ["11:56:04 ص 2026/11/03", "احمد إبراهيم النحاس", "0504731020", "مبنى تجاري", "https://drive.google.com/open?id=1-WHWFr-4UFNZw1ooyfAUfekP7Z_IfvzL", "18.279716, 42.592943"],
+      ["12:01:09 م 2026/11/03", "محمد ذياب الدوسري", "0505756399", "مبنى تجاري", "https://drive.google.com/open?id=196uTb4dgMwYw2wgU8FC-x_I3LEqRiFP4", "18.279284, 42.592616"],
+      ["12:21:20 م 2026/11/03", "احمد عيسى الصغير", "‭050 678 6723‬", "مبنى تجاري", "https://drive.google.com/open?id=1O0enPN-xQueHx0fQK6pmSADzWFSvFTyd", "18.279024, 42.592740"],
+      ["12:23:37 م 2026/11/03", "بدر شجاع القحطاني", "0552342444", "مبنى تجاري", "https://drive.google.com/open?id=1vlh88osBJ5Vr0Q7y8QAWsoVo6SC0YPkt", "18.278816, 42.592598"],
+      ["12:27:24 م 2026/11/03", "سعيد محمد عون", "0555750942", "مبنى تجاري", "https://drive.google.com/open?id=1FEbu_IPdyolVDLSzboFPS5q197stz0_P", "18.278328, 42.592570"],
+      ["12:30:42 م 2026/11/03", "سعيد مشبب الاحمري (مبنى تحت الإنشاء)", "0549001951", "مبنى تجاري", "https://drive.google.com/open?id=1mr7E1ZXr-th9IJYXL2MiL9RnWSZWyoen", "18.277685, 42.592393"],
+      ["12:33:33 م 2026/11/03", "عبدالرحمن عبدالله القحطاني", "0504740800", "مبنى تجاري", "https://drive.google.com/open?id=1Bo-dHiDQhdsXCkRx6QftkUjX12d10sZW", "18.277408, 42.592418"],
+      ["12:40:53 م 2026/11/03", "سعيد عوضه فهيد عسيري", "", "مبنى تجاري", "https://drive.google.com/open?id=1z2Kqd_RJeJMWxVV9pea-1MuvEOc9Pc41", "18.277183, 42.592288"],
+      ["12:43:12 م 2026/11/03", "علي هادي القحطاني", "0547889996", "مبنى تجاري", "https://drive.google.com/open?id=1diPy_YLankk2BogTGfMgQOPkK2OqQtmR", "18.276908, 42.592245"],
+      ["12:49:58 م 2026/11/03", "علي هادي القحطاني", "0547889996", "مبنى تجاري", "https://drive.google.com/open?id=1-KszFh1SfilRFHD7DeNvMlslE126caMX", "18.276515, 42.592140"],
+      ["12:54:24 م 2026/11/03", "علي ظافر الاسمري", "‭050 308 4004‬", "مبنى تجاري", "https://drive.google.com/open?id=17Ku2gKWpuTCUXy9reyBXCPWxOh3Y-c1Y", "18.276368, 42.592116"],
+      ["12:57:51 م 2026/11/03", "سعد عبدالله", "0564082468", "مبنى تجاري", "https://drive.google.com/open?id=1Q1zOILbFLeOS6r6sedUEhcqsnIPrrSFF", "18.276125, 42.592049"],
+      ["1:01:59 م 2026/11/03", "سعيد سعد القحطاني", "0551934222", "مبنى تجاري", "https://drive.google.com/open?id=1pik9tI0T9Mmg3o61i36w09l2qI7ZL5-U", "18.275772, 42.591946"],
+      ["1:04:50 م 2026/11/03", "محمد سعد الأحمري", "0503950754", "مبنى تجاري", "https://drive.google.com/open?id=1nzFgtQ1q9jByokFKDvWTny3Ac2Mz-qmJ", "18.275494, 42.591924"],
+      ["1:06:37 م 2026/11/03", "غير معروف", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1aJ3ai6DDEg4lHOo6_JEXY8cORCs24Elz", "18.272997, 42.591298"],
+      ["1:10:10 م 2026/11/03", "محمد إبراهيم مغرم", "0557104004", "مبنى تجاري", "https://drive.google.com/open?id=1Vm9M34Ozkq5GOhjkuz7F_N0eg8w5gAZx", "18.269405, 42.590629"],
+      ["1:12:35 م 2026/11/03", "محمد علي القحطاني", "0545587377", "مبنى تجاري", "https://drive.google.com/open?id=1nuQc6PivmOUCg84n4S0qnVb6hjHm98Pc", "18.269405, 42.590629"],
+      ["1:14:30 م 2026/11/03", "محمد علي القحطاني", "0545587377", "مبنى تجاري", "https://drive.google.com/open?id=1eulk2wHPcYrIY3CoZHirhfZj0HFNSSqJ", "18.267883, 42.590548"],
+      ["1:15:24 م 2026/11/03", "أرض فضاء ملك الامانه", "أرض فضاء ملك الامانه", "ارض فضاء", "https://drive.google.com/open?id=1DLDDK-Gx9mkjphCF8MuXT8D_tHYFHQZV", "18.266608, 42.590501"],
+      ["1:19:00 م 2026/11/03", "يوسف محمد ال مساعد", "0554755220", "مبنى تجاري", "https://drive.google.com/open?id=1et9GR3n4vpAe9Pm06hKoQzLTyuSQlYQz", "18.263947, 42.592466"],
+      ["1:20:23 م 2026/11/03", "غير معروف أرض فضاء", "غير معروف أرض فضاء", "ارض فضاء", "https://drive.google.com/open?id=18hWu_zyX99cKUxROFCjsamBtfqtCmC_e", "18.262875, 42.593070"],
+      ["1:24:34 م 2026/11/03", "غانم شجاع القحطاني", "0508377705", "مبنى تجاري", "https://drive.google.com/open?id=1YfywRt3ZsXyzCPZxaKy7s_CJGxfW0Vy0", "18.258617, 42.594019"],
+      ["1:26:31 م 2026/11/03", "غير معروف أرض فضاء", "غير معروف أرض فضاء", "ارض فضاء", "https://drive.google.com/open?id=1IPKuGE4jJ4w8M7y_2objEkpRiE-PJo8A", "18.255563, 42.595512"],
+      ["1:29:00 م 2026/11/03", "ناصر عبدالرحمن الأحمري", "‭050 575 3841‬", "مبنى تجاري", "https://drive.google.com/open?id=179nx9bakGeOlAdbJ0O1BuM3W4hAjrssb", "18.254023, 42.597099"],
+      ["1:29:38 م 2026/11/03", "أرض فضاء", "غير معروف", "ارض فضاء", "https://drive.google.com/open?id=1JFw1NwaCvZD7xQeicOvXtAC5Rro9IsDZ", "18.253508, 42.597437"],
+      ["1:34:48 م 2026/11/03", "عبدالله محمد القحطاني", "0555789960", "مبنى تجاري", "https://drive.google.com/open?id=1n067GEYIrQociqubdS1Q5_KwjrgbqsH3", "18.252986, 42.597549"],
+      ["1:38:48 م 2026/11/03", "عبدالله سعد ال حامد", "0503875123", "مبنى تجاري", "https://drive.google.com/open?id=1x-bnM3MEOh3lKUsQR7g4iEdgpXJsOWzx", "18.252571, 42.597789"],
+      ["1:42:47 م 2026/11/03", "عبود عبدالرحمن ال مشبب", "0553333738", "مبنى تجاري", "https://drive.google.com/open?id=1Aq7cz_5aIM0NB_Jlgm8B6ia4TPxWv04A", "18.251950, 42.598075"],
+      ["1:45:10 م 2026/11/03", "غانم شجاع القحطاني", "0508377705", "مبنى تجاري", "https://drive.google.com/open?id=1u9Kj6tVJCNAIse_JBIIX3hFlr-ZS8ldm", "18.251395, 42.598466"],
+      ["1:47:31 م 2026/11/03", "سليمان عبدالعزيز السياري", "‭055 547 1416‬", "مبنى تجاري", "https://drive.google.com/open?id=1sokwm5PQ6QoUkjmNNPzj6AOOvxITwJM5", "18.251014, 42.598596"],
+      ["1:49:37 م 2026/11/03", "سليمان عبدالعزيز السياري", "0546463646", "مبنى تجاري", "https://drive.google.com/open?id=1NAPWVQy1URcAcrbJIq8jd10XghVa_P8q", "18.250319, 42.598753"],
+      ["1:52:01 م 2026/11/03", "سليمان عبدالعزيز السياري", "‭055 547 1416‬", "مبنى تجاري", "https://drive.google.com/open?id=1Kzb9l7kaOaK0bOsipL5e95DNBjmyxN7M", "18.249217, 42.599083"],
+      ["1:55:26 م 2026/11/03", "سعد سليمان السياري", "‭054 444 1059‬", "مبنى تجاري", "https://drive.google.com/open?id=1ukgEMfQffd5gMiDLC8QaC3TwStqCPCRq", "18.248260, 42.599331"],
+      ["1:57:09 م 2026/11/03", "عادل الشغرود", "0554009393", "مبنى تجاري", "https://drive.google.com/open?id=1SmGjFqGbd3hLjIqGoeMstRQe86azTXE_", "18.247888, 42.599478"],
+      ["2:00:02 م 2026/11/03", "عبدالرحمن عبدالعزيز السياري", "‭056 654 7799‬", "مبنى تجاري", "https://drive.google.com/open?id=16UsR4p7twYrGd78jxNzKP5PY4TadPxdQ", "18.247168, 42.599742"]
+    ];
+
+    // Initial snapshot for Mohammed Mogram
+    const INITIAL_MOHAMMED_ROWS = [
+      ["10:18:27 ص 2026/11/01", "نوره", "نوره", "ارض فضاء", "", ""],
+      ["10:48:45 ص 2026/11/01", "سالم منصور القحطاني", "505741040", "مبنى تجاري", "https://drive.google.com/open?id=16SuasiSTbsAPgwGjczII6oDXINg5S6Cq", "18.285181, 42.593282"],
+      ["10:55:25 ص 2026/11/01", "سالم مسفر الوادعي", "0507730372", "مبنى تجاري", "https://drive.google.com/open?id=1i75OTxd4wl2A7gnL2SLV_GGrrdCdYPRU", "18.230692, 42.556640"],
+      ["10:57:54 ص 2026/11/01", "سعود مسفر الوادعي", "0558901878", "مبنى تجاري", "https://drive.google.com/open?id=1nH1fozxNv0W85vb62Mu-uDuld_lR0OPY", "18.230531, 42.556801"],
+      ["11:07:57 ص 2026/11/01", "عبدالله شاهر", "0539498052", "مبنى تجاري", "https://drive.google.com/open?id=1PgaczYSYKFDrNJxPYDFZ8R-V0OrQLRmB", "18.230388, 42.556861"],
+      ["11:12:58 ص 2026/11/01", "سعيد محمد القاضي", "0505751266", "مبنى تجاري", "", ""],
+      ["11:14:04 ص 2026/11/01", "سعيد محمد القاضي", "0505751266", "مبنى تجاري", "https://drive.google.com/open?id=1X4HNt6fqzeWGT2--w1PUSI6wjx_Tc7m8", "18.230174, 42.557052"],
+      ["11:18:28 ص 2026/11/01", "جابر مشبب الكاسي", "0502256655", "مبنى تجاري", "https://drive.google.com/open?id=1W75nshWnaUPRWlgIhpjCMdOMlswBacrt", "18.230231, 42.557007"],
+      ["11:20:53 ص 2026/11/01", "شار الشهري", "0506750851", "مبنى تجاري", "https://drive.google.com/open?id=1ARz4p1PXZ4wdGzaokxqkL21nwSudmSxc", "18.229815, 42.557285"],
+      ["11:30:59 ص 2026/11/01", "سعيد الغامدي", "0503084745", "مبنى تجاري", "https://drive.google.com/open?id=1jQnAckZcpAaHiz3eFnPg_26G9e7yaBHV", "18.229750, 42.557262"],
+      ["11:33:12 ص 2026/11/01", "حسين محمد حسين عمار", "0505369649", "مبنى تجاري", "https://drive.google.com/open?id=1zQkcyS0_7khKtrhOSEVzyrzmOh4lRrav", "18.229061, 42.557679"],
+      ["11:40:59 ص 2026/11/01", "محمد بن عوض القحطاني", "0504455885", "مبنى تجاري", "https://drive.google.com/open?id=1pgKnGD3HZB4LmLvGjhxKqNf7kolWo2hh", ""],
+      ["11:46:09 ص 2026/11/01", "علي محمد القحطاني", "0555764192", "مبنى تجاري", "https://drive.google.com/open?id=1BmvcpxgKxgkLimZnFFeuaNJb0mKKXvQx", "18.228251, 42.558067"],
+      ["11:50:56 ص 2026/11/01", "حسن مجلي القحطاني", "0555653010", "مبنى تجاري", "https://drive.google.com/open?id=1JDLCtMO6kb8opbH5FoEI8VkV0V93xrNi", "18.228342, 42.55809"],
+      ["11:59:21 ص 2026/11/01", "المستثمر شركه درعه", "0536408515", "مبنى تجاري", "https://drive.google.com/open?id=1oOqYHjsCXiQKTo-mGbYwUha4cQmMe5Tf", "18.227932, 42.558457"],
+      ["12:19:20 م 2026/11/01", "مستثمر بأسم شركه بشاور حاشي", "0553947687", "مبنى تجاري", "https://drive.google.com/open?id=1_qHHR1dickJkDmdbhXDKTz8pXLPGqCgA", "18.188290, 42.824782"],
+      ["12:28:04 م 2026/11/01", "علي عبدالرحمن محمد مشببب", "0583366525", "مبنى تجاري", "https://drive.google.com/open?id=1RXb7lW5L8cV7Z9jl8BeSyJjnS-jvMsM7", "18.227360, 42.558875"],
+      ["12:34:47 م 2026/11/01", "عبدالرحمن بن صالح بن حافظ", "0555266885", "مبنى تجاري", "https://drive.google.com/open?id=1ImQPKfLak-MExkm_WSaKE9a-bgohl45B", "18.227120, 42.559024"],
+      ["12:39:51 م 2026/11/01", "صقر عبدالخالق القحطاني", "0597989666", "مبنى تجاري", "https://drive.google.com/open?id=1-r3A2ppomOVd08YQvrFeQu1IZnpNjKc_", "18.226610, 42.559318"],
+      ["12:46:27 م 2026/11/01", "محمد بن احمد معتق القحطاني", "0504369092", "مبنى تجاري", "https://drive.google.com/open?id=1NfWcmTWWmRaE9CJqpi2DWWF6kRKpItY8", "18.225913, 42.559734"],
+      ["1:01:46 م 2026/11/01", "حسن ال عمره", "0582978889", "مبنى تجاري", "https://drive.google.com/open?id=1s_STkn3upj0xsPkv3IGgkB3ciXLfHLwR", "18.225672, 42.559717"],
+      ["1:09:16 م 2026/11/01", "إبراهيم العكاسي وتابع لجمعيه الكوثر مستثمر", "0555751887", "ارض فضاء", "https://drive.google.com/open?id=1kxowzYmZLJzSxhaFfZ6_Gzl1VmJ8LPu0", "18.222809, 42.561293"],
+      ["1:13:21 م 2026/11/01", "فواز فايز العلياني", "0545065566", "مبنى تجاري", "https://drive.google.com/open?id=1zHIt_wbWHMHUPR3ksKakAEz006QL1FuF", "18.222611, 42.561272"],
+      ["1:17:59 م 2026/11/01", "عبد العزيز محمد هادي", "0544890775", "مبنى تجاري", "https://drive.google.com/open?id=1BK6CjBqG-5GboFr0scVkHrFFyMRFCvw6", "18.222458, 42.561320"],
+      ["1:23:39 م 2026/11/01", "المستثمر جمعيه الكوثر والمالك المبنى سلطان حامد", "0504758587", "مبنى تجاري", "https://drive.google.com/open?id=1VTBftxFvsBTSGlu5qpVZ_sjLgA8rqeOU", "18.222124, 42.561379"],
+      ["1:27:23 م 2026/11/01", "شفياء على سعيد الاحمري", "0557114288", "مبنى تجاري", "https://drive.google.com/open?id=1TKPfIyRjVKHV-SIp-o7WNeZKM5Cj_0X6", "18.221946, 42.561405"],
+      ["1:33:54 م 2026/11/01", "مبنى تجاري  صبحان الوادعي", "0556555510", "مبنى تجاري", "https://drive.google.com/open?id=1DH-9qbCMeCXCh7NqdtzElfoWQld3wkTA", "18.221556, 42.561567"],
+      ["1:39:30 م 2026/11/01", "علي القحطاني", "0547777738", "مبنى تجاري", "https://drive.google.com/open?id=1jj3kL1s16UPMJHmo9AGLWmQgqTqLaIJl", "18.220593, 42.561708"],
+      ["1:41:23 م 2026/11/01", "علي عبدالله سعيد الشهري", "", "ارض فضاء", "https://drive.google.com/open?id=1TdXpl6xE5VOu_MV5VSCAiLzZAhok0vm6", "18.219961, 42.561844"],
+      ["1:49:41 م 2026/11/01", "محمد يحي محمد الشهراني مستثمر من قبل  صيدليه الدواء", "0504740067", "مبنى تجاري", "https://drive.google.com/open?id=1SS5TW-EhkLCgf4w3bR5iBht9_s895cXc", "18.219576, 42.561824"],
+      ["1:52:30 م 2026/11/01", "سعد عبدالله ابو شابل", "0533046000", "مبنى تجاري", "https://drive.google.com/open?id=1CnIJSGJL4t5GEnPXAXTXhM86g_ngfW-k", "18.218560, 42.561801"],
+      ["1:55:55 م 2026/11/01", "شركه سديم", "0550414488", "مبنى تجاري", "https://drive.google.com/open?id=10t84QxsQVUOhYPUEEATiB7fzYjeWaz7K", ""],
+      ["1:59:32 م 2026/11/01", "مبارك علي القحطاني", "0548125454", "مبنى تجاري", "https://drive.google.com/open?id=1SE0grJtFmoL5FJNnJjg6JpDpCJT4P2DL", "18.218263, 42.561872"],
+      ["2:07:18 م 2026/11/01", "مبنى مستاجر", "", "مبنى تجاري", "https://drive.google.com/open?id=1qowBWCPDDnRnS5HxmO4-QiJJ1liC_nW8", "18.217766, 42.561913"],
+      ["2:12:48 م 2026/11/01", "علي بن حسن مرضي", "0555559495", "مبنى تجاري", "https://drive.google.com/open?id=1-RS4SshfU7Qzc59IkPF86kod5fCe3ivd", "18.216762, 42.561965"],
+      ["2:14:36 م 2026/11/01", "علي القحطاني", "0504745482", "مبنى تجاري", "https://drive.google.com/open?id=1Pe3kRnbg7e_bPe9c7nqSlphhXHhwH9-3", "18.216584, 42.562040"],
+      ["2:20:10 م 2026/11/01", "عبدالعزيز الشمراني", "0505325004", "مبنى تجاري", "https://drive.google.com/open?id=1efqvtoCfu1EwxQbfn0EiZCRKIuzbpBe3", "18.215448, 42.562271"],
+      ["2:24:37 م 2026/11/01", "احمد علي القحطاني", "0506665140", "مبنى تجاري", "https://drive.google.com/open?id=1ptl7kkKSc-VARKg_kP50R5W9izko9v2I", "18.215448, 42.562271"],
+      ["2:28:07 م 2026/11/01", "", "507382397", "مبنى تجاري", "https://drive.google.com/open?id=1PDuQFHBcervsgPx57WU1JC8H1mkZmCIP", "18.214823, 42.562391"],
+      ["2:32:03 م 2026/11/01", "سعيد حاضر شويل العضاضي", "0505752581", "مبنى تجاري", "https://drive.google.com/open?id=16bCH8106XpzlIJumvQMnzTAPWOvq7kCM", "18.213531, 42.562703"],
+      ["2:33:35 م 2026/11/01", "", "", "ارض فضاء", "https://drive.google.com/open?id=18_kV5Co9MB2izQzCe1rBRXNiNCQTHEIW", "18.212824, 42.562738"],
+      ["2:34:18 م 2026/11/01", "", "", "مبنى تجاري", "https://drive.google.com/open?id=1hbNXAsvLAdgOOGKnFl6-X4wx2_GWEJ6P", "18.213074, 42.562695"],
+      ["2:40:21 م 2026/11/01", "علي محمد القحطاني", "0503753383", "مبنى تجاري", "https://drive.google.com/open?id=1dD7cRK-GDl20xsGHkzcKkwYsiYgW8jAK", "18.212605, 42.562821"],
+      ["3:01:45 م 2026/11/01", "سعيد عبدالله ال حموض", "0555748781", "مبنى تجاري", "https://drive.google.com/open?id=1C6o3OOvl3TR332xT4YD1OOeHIh1hhkwy", "18.212333, 42.562880"],
+      ["3:04:01 م 2026/11/01", "لم نتمكن معرفه صاحب الارض", "", "ارض فضاء", "https://drive.google.com/open?id=1K2OYYgZ0y1m2r5Ezp8HgHWj1zHEb5sou", ""],
+      ["3:07:17 م 2026/11/01", "عيسى علي الوادعي", "0555723388", "مبنى تجاري", "https://drive.google.com/open?id=1kVThwMrqpHVRniZNjxTUrKGg2G8BDBEO", "18.211717, 42.563018"],
+      ["3:12:45 م 2026/11/01", "جابر عبدالله الكاسي", "0502256655", "مبنى تجاري", "https://drive.google.com/open?id=1tJ1EhHuFxSwu-B8haY7FymQ-UXh8ZYLy", "18.211237, 42.563034"],
+      ["3:15:04 م 2026/11/01", "سعيد الكاسي", "0505744044", "مبنى تجاري", "https://drive.google.com/open?id=15dqGY7WEa-XC_ObC4e0ihy0Lnrg52ENj", "18.210864, 42.563126"],
+      ["3:21:37 م 2026/11/01", "حسن محمد علي القحطاني", "0501882929", "مبنى تجاري", "https://drive.google.com/open?id=1ai288YZQVr5auprjzrw70oL4nmAcRnKT", "18.210418, 42.563039"],
+      ["3:23:52 م 2026/11/01", "", "", "ارض فضاء", "https://drive.google.com/open?id=1nFNyK8go3DTtEv3GJrqvzzMajuyRnqCm", ""],
+      ["3:27:23 م 2026/11/01", "سعود عبدالهادي", "0555751408", "مبنى تجاري", "https://drive.google.com/open?id=1PFY1r9odLIws8J2dezTnbvNe3ltY2ANf", "18.209613, 42.563112"],
+      ["3:34:48 م 2026/11/01", "يحي البشري", "0504741655", "مبنى تجاري", "https://drive.google.com/open?id=1GC2LEG-1Hza4x9iu3huf7Ajbk-sa8vw2", "18.209456, 42.563117"],
+      ["3:39:06 م 2026/11/01", "عبدالله العسيري", "0551006669", "مبنى تجاري", "https://drive.google.com/open?id=1jgHGVZkw92xY_URuicdfKPRVUye2y03e", "18.209097, 42.563181"],
+      ["3:40:20 م 2026/11/01", "", "", "ارض فضاء", "https://drive.google.com/open?id=1AfMBQJCZLKaB_kDr64JzFslglgzzRhQT", ""],
+      ["3:42:15 م 2026/11/01", "علي بن سعيد بن محمد القحطاني", "0552966669", "مبنى تجاري", "https://drive.google.com/open?id=1oh83Fgzcc0THBlKrZuOlsizQW6iQxceE", "18.208754, 42.563339"]
+    ];
+
+    // Initial snapshot for Naif Madshoosh
+    const INITIAL_NAIF_ROWS = [
+      ["11:05:19 ص 2026/11/01", "عبدالعزيز بن علي بن احمد ال ناجي", "0505750424", "مبنى تجاري", "https://drive.google.com/file/d/1qDiUkS2puTnxXLbJDStbZQImF1y2nztR/view?usp=sharing", "18.287212144965917, 42.59270529323822"],
+      ["11:20:27 ص 2026/11/01", "مطعم مظبيكم قيد الانشاء", "0541982337", "مبنى تجاري", "https://drive.google.com/file/d/17hfjFrhGrEdxw0Flf5cZ7iE7l5_otQg0/view?usp=drive_link", "18.274589332830995, 42.59239613740158"],
+      ["11:31:29 ص 2026/11/01", "سعيد بن محمد بن سعد عتيق", "054584440", "مبنى تجاري", "https://drive.google.com/file/d/11BvhshpfmZdm05WQ1OMhj5eUZkAHvOiY/view?usp=sharing", "18.275303732616628, 42.5926702687709"],
+      ["11:38:55 ص 2026/11/01", "عطره سعيد علي ال رفيدي", "0553739217", "مبنى تجاري", "https://drive.google.com/open?id=1rWXIDojjDTN5kNZoTwUFAfJcpaMqm_fh", "18.276780, 42.592822"],
+      ["11:45:47 ص 2026/11/01", "عبدالله سعيد دعبوس العسيري", "0554734797", "مبنى تجاري", "https://drive.google.com/file/d/1dRVWPkqgXMiSkLdJlokOKRmjTj1bAxGY/view?usp=drive_link", "18.275859165425835, 42.59277041821685"],
+      ["11:48:09 ص 2026/11/01", "اسماء عبدالله سعيد الاحمري", "0533655564", "مبنى تجاري", "https://drive.google.com/open?id=1YIfPc042kDfdDLJgvEz7pus4VjiEOQZp", "18.232452, 42.554975"],
+      ["11:50:12 ص 2026/11/01", "عطره سعيد علي آل رفيدي", "0553739217", "مبنى تجاري", "https://drive.google.com/open?id=1wyG8wMh_i3N-9Tvay1oMj_a0ks3AqhjK", "18.276897286000146, 42.592854310927756"],
+      ["11:57:59 ص 2026/11/01", "عبدالله ابن محمد ابن جبران القحطاني", "0545900020", "مبنى تجاري", "https://drive.google.com/open?id=1LtGg4MUjPGKQFHQ5l4dLr2Bq89CV4VmG", "18.277434, 42.593177"],
+      ["12:01:07 م 2026/11/01", "حسن بن عبدالله بن حامد القحطاني", "0555653010", "مبنى تجاري", "https://drive.google.com/file/d/1hawBibkTgExrXL5O0_g8Zw_QBiXHQl3D/view?usp=sharing", "18.27863198734437, 42.59368608709745"],
+      ["12:05:00 م 2026/11/01", "عبدالله ابن محمد ابن جبران القحطاني", "0545900020", "مبنى تجاري", "https://drive.google.com/file/d/1LBkxCXNSY_hn4owEI2_7lnVVmjhIoYOD/view?usp=sharing", "18.2797339306603, 42.593517089536846"],
+      ["12:12:06 م 2026/11/01", "ظافر عبدالله محمد الشهري", "0555761552", "مبنى تجاري", "https://drive.google.com/open?id=1TTa8ZdjY1rXHoh9NlO_opbXV0MDYxkZl", "18.281934, 42.593857"],
+      ["12:14:58 م 2026/11/01", "محمد بن مشبب بن سلمان القحطاني", "0556785000", "مبنى تجاري", "https://drive.google.com/open?id=1y--DQHranlUJN0-BRNbIZc8eVaSUhGQb", "18.283407, 42.593598"],
+      ["12:26:53 م 2026/11/01", "فضل الرحمن ولايت", "0500550914", "مبنى تجاري", "", ""],
+      ["12:29:33 م 2026/11/01", "مريع علي مريع عسيري", "0535071458", "مبنى تجاري", "https://drive.google.com/open?id=1ZIrPwyLZb03SqJscGo_rURg-VYKZBeDa", "18.218399, 42.547667"],
+      ["12:36:19 م 2026/11/01", "محمد بن عبدالله بن عبدالرحمن ال ناجي القحطاني", "0558800231", "مبنى تجاري", "https://drive.google.com/open?id=1W1aCguDxhqeg7nuDKT3LGx3IIWmbQnu1", "18.284075, 42.593342"],
+      ["12:43:33 م 2026/11/01", "معيضه علي مداوي ال مداوي", "0552374763", "مبنى تجاري", "https://drive.google.com/file/d/1JsTMbQfBqi6du7-PkqBciH4ahb-Wbkdm/view?usp=sharing", ""],
+      ["12:46:27 م 2026/11/01", "مبنى حكومي تابع لصحة القابضة", "لا يوجد", "مبنى حكومي", "https://drive.google.com/file/d/1pbAUC6vAYtuDanN5jH2zqoWW_W452RXf/view?usp=sharing", "18.28446529598983, 42.59334190068684"],
+      ["12:48:22 م 2026/11/01", "مداوي محمد سعيد الشهري", "0557776630", "مبنى تجاري", "https://drive.google.com/open?id=1sDSvw3bsxIw5NNlVlWlA3QB8mfs2Ooy7", "18.284889, 42.593080"],
+      ["12:50:18 م 2026/11/01", "جامعه ام المؤمنين ( عايشه) تابع للاوقاف", "لا يوجد", "مبنى حكومي", "https://drive.google.com/open?id=1QXUahZpchnBleQRSA1x_p7UC5NRCPCbc", "18.285151, 42.593026"],
+      ["9:45:42 ص 2026/11/03", "عبدالله محمد سعيد ال جلفان", "0502522044", "مبنى تجاري", "https://drive.google.com/open?id=1Lm-6ZHbx9fHds7N34rt8rVCqTIxYpwXj", "18.285840, 42.593117"],
+      ["9:50:30 ص 2026/11/03", "محسنه ابراهيم عيسى حسن ( مبنى قيد الانشاء)", "0553239599", "مبنى تجاري", "https://drive.google.com/open?id=1H8pXOB1D5cKaYehRd1Sm6EJ89WqbPSpb", "18.286128, 42.593203"],
+      ["9:59:16 ص 2026/11/03", "محمد مانع محمد ال تهامي", "0544447757", "مبنى تجاري", "https://drive.google.com/open?id=1gEYFO5aIY9DzwXEYi_1cGToYJ7ivkCSu", "18.286235, 42.593218"],
+      ["10:04:32 ص 2026/11/03", "ضيف الله الاسمري", "0506621116", "مبنى تجاري", "https://drive.google.com/open?id=1TxB9RByG8ctJaQ5F5Y5h6KVNBfXIjPaU", "18.287195, 42.593301"],
+      ["10:07:04 ص 2026/11/03", "احمد عبدالله", "0503083161", "مبنى تجاري", "https://drive.google.com/open?id=1PkCA_vBj2a3CZeb6qDafYKUb3y-YSGEZ", "18.287392, 42.593293"],
+      ["10:08:56 ص 2026/11/03", "حاتم الشهري", "0545678548", "مبنى تجاري", "https://drive.google.com/open?id=14RiD-Yyh9fJ29_lfwdy0ddv0fl8Tfy_m", "18.287721, 42.593416"],
+      ["10:12:56 ص 2026/11/03", "مجمع كنف الطبي المشغل للمبنى بالكامل", "0543922555 رقم ادارة المستشفى", "مبنى تجاري", "https://drive.google.com/open?id=1irEyhZJcF8TGUBliTLm8LaBY79YXlzTJ", "18.287823, 42.593431"],
+      ["10:15:31 ص 2026/11/03", "محمد يحيى زياد", "0561211555 رقم اخر لصاحب المبنى 0507077733", "مبنى تجاري", "https://drive.google.com/open?id=1Bkcq-fkCDlUD3s3WFX_3UWvV4pbeHu0M", "18.288108, 42.593432"],
+      ["10:19:54 ص 2026/11/03", "مبنى حكومي محطة الإرسال الاذاعي بابها", "", "مبنى حكومي", "https://drive.google.com/open?id=1Xup7XfYAHs-CbJklkaRQOjuCY3qaLbdG", "18.290912, 42.594209"],
+      ["10:26:01 ص 2026/11/03", "محمد بن عمير", "0534043555", "مبنى تجاري", "https://drive.google.com/open?id=1xsw9C73APp_59mmh0WJGqwA9nSyFkb9K", "18.299764, 42.594402"],
+      ["10:32:11 ص 2026/11/03", "عادل الزامل", "0505751906", "مبنى تجاري", "https://drive.google.com/open?id=1fdggYumrdoThE9CSO2NfSFVc-kR6Nvbs", "18.300420, 42.594593"],
+      ["10:37:30 ص 2026/11/03", "مدينة الامير سلطان بن عبدالعزيز الرياضية", "", "مبنى حكومي", "https://drive.google.com/open?id=1krxCi1chcOUeACjDmWZe8tsxzZ455KkT", "18.311049, 42.597390"],
+      ["11:08:54 ص 2026/11/03", "محمد البارق", "055780088", "مبنى تجاري", "https://drive.google.com/open?id=1hm2XQ1fzhWA6if6rbCMx1xf8kXxGymDr", "18.268021, 42.591463"],
+      ["11:15:28 ص 2026/11/03", "سعيد علي جبران القحطاني", "0554551357", "مبنى تجاري", "https://drive.google.com/open?id=1XhS4nRP2RH0xI2oplTK7N17kSLxWeq2J", ""],
+      ["11:19:09 ص 2026/11/03", "سعيد ابن محمد ابن معيض القحطاني", "0555758842", "مبنى تجاري", "https://drive.google.com/open?id=1cAiYTs-r2n3B75ObHr9smbXYNNHMTpSE", "18.273451, 42.592044"],
+      ["11:33:43 ص 2026/11/03", "محمد احمد علي الاسمري", "053511883", "مبنى تجاري", "https://drive.google.com/open?id=11OnnP0JvpJ5H1znEm0FvSAq84mGkGAVy", "18.274324, 42.592258"],
+      ["11:51:31 ص 2026/11/03", "عبدالله علي الاحمري", "0504732294", "مبنى تجاري", "https://drive.google.com/open?id=1EBQcy4LDPfSs-u_M8to6LS8w_5QmqI2m", "18.243317, 42.601164"],
+      ["11:52:43 ص 2026/11/03", "فالح عسير", ": 0557757536", "مبنى تجاري", "https://drive.google.com/open?id=1VoVJy7MyZl-ePEPkkaloNG3FSgJRBONw", "18.254172, 42.598103"],
+      ["12:17:05 م 2026/11/03", "سعيد عطيه حويس الحارثي", "0505710900", "مبنى تجاري", "https://drive.google.com/open?id=1WeTHPS9hVvU3AkbUsy_VXWPB5JOZD3O2", "18.255799, 42.596054"],
+      ["12:19:03 م 2026/11/03", "محمد ناصر القحطاني", "0567309884", "مبنى تجاري", "https://drive.google.com/open?id=1_dtn9EQVIEjQBh5ZWU_hbJgFzhHEi6Tt", "18.261176, 42.594042"]
+    ];
+
+    // Initial snapshot from the Google Sheet (used immediately and updated live on page load)
+    const INITIAL_GOOGLE_SHEET_ROWS = [
+      ["3:44:58 م 2026/11/01", "محمد عامر", "0532445493", "مبنى تجاري", "https://drive.google.com/open?id=1J9vDjcijjGlRWITHcY1Dn_WrhXG-5rHW", "18.230085962337945, 42.50860745127078"],
+      ["3:46:42 م 2026/11/01", "منصور بن طفران", "0505748837", "مبنى تجاري", "https://drive.google.com/open?id=1tHwhsd6eqtbBAHuvK0a4zUiorpkK8lY1", "18.22968173937129, 42.509014020051985"],
+      ["3:48:25 م 2026/11/01", "تركي عباس", "0569898988", "مبنى تجاري", "https://drive.google.com/open?id=1Kf0sNpHNIfpRKP3_eIr4B-jOXSNwaedi", "18.228822, 42.509308"],
+      ["3:49:34 م 2026/11/01", "نايف اليامي", "556776888", "مبنى تجاري", "https://drive.google.com/open?id=1jeoo8tILwnUkMByK_xIWX6tjUmeRLGu8", "18.239274, 42.600992"],
+      ["3:50:51 م 2026/11/01", "محمد بن نمشة", "0555748340", "مبنى تجاري", "https://drive.google.com/open?id=1hLW3JotpdHmeMLmqnP_USibkCDaz-dzd", "18.214000, 42.515891"],
+      ["3:52:07 م 2026/11/01", "محمد الصياد", "0531672817", "مبنى تجاري", "https://drive.google.com/open?id=1Dz0tX3eDUIirt8t-2NNPf5G9E8C1ZyPQ", "18.220071, 42.520823"],
+      ["3:53:20 م 2026/11/01", "محمد قدح", "555990952", "مبنى تجاري", "https://drive.google.com/open?id=1s6O61znZmWtMZD-oYxs8YsvE024VB9D7", "18.219324, 42.517395"],
+      ["3:54:30 م 2026/11/01", "سعيد الشهراني", "556233232", "مبنى تجاري", "https://drive.google.com/open?id=14sq9VcPhno4t8JA0Hp8BwMBVbp0wtdzh", "18.219324, 42.517395"],
+      ["3:56:04 م 2026/11/01", "يحي قرقر", "505750852", "مبنى تجاري", "https://drive.google.com/open?id=1w8uZ0qvrCegnGGV-PmioC_Tqr7t2P2hw", "18.219992, 42.519342"],
+      ["3:57:33 م 2026/11/01", "خالد اليافعي", "554180556", "مبنى تجاري", "https://drive.google.com/open?id=1CLzRGjlAS6HPxEmD8OorxEk8bqfQWO-S", "18.219887, 42.51853"],
+      ["3:59:05 م 2026/11/01", "مكتب", "0553631396", "مبنى تجاري", "https://drive.google.com/open?id=1eE0Vv2bQIinfhI0l1Pvzy88tBskUyWxb", ""],
+      ["4:00:21 م 2026/11/01", "سعد سعيد", "553066556", "مبنى تجاري", "https://drive.google.com/open?id=1JB21eh62_prgFX8lN4DJf3OMt12oUnYA", ""],
+      ["4:01:23 م 2026/11/01", "الراقدي", "0504205064", "مبنى تجاري", "https://drive.google.com/open?id=1FJgfGggF-0BvjaRKO-f3PTB0uCMubB7p", "18.219893, 42.519373"],
+      ["4:02:43 م 2026/11/01", "محمد مشبب", "504730050", "مبنى تجاري", "https://drive.google.com/open?id=1zxJRYNpL_Jx2ofPSwSSS-0v7wj9w6xZ3", "18.219993, 42.519297"],
+      ["4:03:56 م 2026/11/01", "فهد اليامي", "0506666060", "مبنى تجاري", "https://drive.google.com/open?id=1xlIvKZP3GDJGe_8wuKmzgxLGHJo6fsol", "18.226734, 42.541858"],
+      ["4:05:40 م 2026/11/01", "البشري", "0569999025", "مبنى تجاري", "https://drive.google.com/open?id=1CLTwdGaosAi0xDh81zHC70b29CfGA2sL", "18.234092, 42.654846"],
+      ["4:07:09 م 2026/11/01", "علي حنبص", "0509378378", "مبنى حكومي", "https://drive.google.com/open?id=1wRZqIHFAOg3BESPq333o1ZxAcezgrvQk", "18.218186, 42.527757"],
+      ["4:08:57 م 2026/11/01", "شركة اليحيا", "0541982337", "مبنى تجاري", "https://drive.google.com/open?id=1OTcuY7h_hD9yRDwfgTttSBSDLSDPjBd-", ""],
+      ["4:10:36 م 2026/11/01", "حامد خليل", "0505751215", "مبنى تجاري", "https://drive.google.com/open?id=1ER_JKE68HIs7IxATn5Is1Tizkh7GySaK", ""],
+      ["4:11:42 م 2026/11/01", "علي عبدالله", "50235886", "مبنى تجاري", "https://drive.google.com/open?id=1QHJjR216EOCeIb08WPJAgr-0YNafY2MK", "18.230802, 42.552994"],
+      ["5:36:48 م 2026/11/01", "شركة الجزيرة", "051 013 3837", "مبنى تجاري", "https://drive.google.com/open?id=19FqI6bIR8ZyGglRp08y-b-AKJUavXUlx", "18.307637, 42.709752"],
+      ["5:38:56 م 2026/11/01", "عبدالحكيم مجمع بلازا", "050 748 4408", "مبنى تجاري", "https://drive.google.com/open?id=1okdmE16J2u99rnD0XaPoRc89GOwv67Yc", "18.234772, 42.562920"],
+      ["5:41:04 م 2026/11/01", "سلطان", "+966 56 199 7000", "مبنى تجاري", "https://drive.google.com/open?id=1jc6kJaEMxV6bqkROmjc43K20M7L8ZSeX", "18.236546, 42.592235"],
+      ["8:36:27 م 2026/11/01", "سعيد السرحاني", "0503678952", "مبنى تجاري", "https://drive.google.com/open?id=1l02B-ktyEaYiCZh04ENXA1X_gOjZ94Zm", "18.230312, 42.550428"],
+      ["8:39:45 م 2026/11/01", "أسواق العثيم", "920000702", "مبنى تجاري", "https://drive.google.com/open?id=10xZgEvjPUoEa5MS2J6e_4pi3nF2zC4am", "18.241022, 42.575875"],
+      ["8:45:11 م 2026/11/01", "بصمة الهرم", "5706179506", "مبنى تجاري", "https://drive.google.com/open?id=1ZkaBxtbQC1Y5slfE1q-24wbXE1vfLgVx", "18.248268, 42.620399"],
+      ["8:47:09 م 2026/11/01", "قصر الاواني", "0555260533", "مبنى تجاري", "https://drive.google.com/open?id=1X2sYI03CZkkp8ILKrzOv21Ab-ERFdkyZ", "18.247736, 42.619503"],
+      ["8:49:17 م 2026/11/01", "عالم المتسوق", "+966 54 035 5655", "مبنى تجاري", "https://drive.google.com/open?id=1u5a9z7MfeKH1M_KSfBOdiSe20W7dM3YW", "18.220696, 42.531250"],
+      ["8:56:58 م 2026/11/01", "مكتبة نجمة الفاروق", "0530146260", "مبنى تجاري", "https://drive.google.com/open?id=1nzMjcvexXqtn58_OdWx7q-AOZ_LIwtUL", "18.265289, 42.642805"],
+      ["8:59:36 م 2026/11/01", "شركة صالح وعبدالعزيز باحسين", "920022122", "مبنى تجاري", "https://drive.google.com/open?id=1TpXm55ogeJDdr3UmJsqgj1kgbw-Rx16l", "18.264241, 42.642309"],
+      ["9:03:44 م 2026/11/01", "التوكيلات العالمية لسيارات", "012272020", "مبنى تجاري", "https://drive.google.com/open?id=1nv-Ctnr2Zh6a1vOaPUl_wDbvU3LuGwFT", "18.255739, 42.632441"],
+      ["9:06:46 م 2026/11/01", "مطعم الزاكي", "0559160123", "مبنى تجاري", "https://drive.google.com/open?id=1TeiqjODYwwAWsqsKOW4UlCyNGse8I-1B", "18.258945, 42.635330"],
+      ["9:08:36 م 2026/11/01", "مكتبة الكاتب", "0533315117", "مبنى تجاري", "https://drive.google.com/open?id=1H6CV8AfdjpKF_Daad7i6hQY99B7EDxIg", "18.259227, 42.635708"],
+      ["9:10:33 م 2026/11/01", "شركة شري", "920033338", "مبنى تجاري, مبنى حكومي", "https://drive.google.com/open?id=1gb3xSVv8yp5XvxyQwBrM1Bx8MTVGYL7g", "18.261970, 42.638661"],
+      ["9:12:23 م 2026/11/01", "دلفت", "0172256666", "مبنى تجاري", "https://drive.google.com/open?id=1ZfBBjCWHAWkRZJElNCvewzNH0VrbCZGb", "18.263159, 42.640003"],
+      ["9:15:29 م 2026/11/01", "شركة عبدالهادي القحطاني", "172276283", "مبنى تجاري", "https://drive.google.com/open?id=1uUNh5KeJEOrLFE_P_16PD0J9x8MLeVvQ", "18.265916, 42.650104"],
+      ["9:17:08 م 2026/11/01", "مجمع بن داود", "8002442226", "مبنى تجاري", "https://drive.google.com/open?id=1IDvZpKSBWnX_G2rdeae6KcNb8bThYXbm", "18.269248, 42.657607"],
+      ["9:20:05 م 2026/11/01", "العدواني لمواد البناء", "542684219", "مبنى تجاري", "https://drive.google.com/open?id=1xos-TWWpT5fMLGEbA5xDKxZbkxxuqP37", "18.269030, 42.654831"],
+      ["9:23:30 م 2026/11/01", "شركة فورد", "8001240218", "مبنى تجاري", "https://drive.google.com/open?id=1UREeQqnoJv1wwA_Cq2AIVqpXBzTRzrqK", ""],
+      ["9:25:10 م 2026/11/01", "الدمعان لنقل السيارات", "920032000", "مبنى تجاري", "https://drive.google.com/open?id=1GTZeNykLLd6GQPDXDwY6Cv0ts9GVSg81", "18.265497, 42.643547"],
+      ["9:26:52 م 2026/11/01", "مقهى دبليو", "552021819", "مبنى تجاري", "https://drive.google.com/open?id=11ZhmscvdpHCihQ1LXdX3_AbP3hokCDP_", "18.265286, 42.642810"],
+      ["9:28:36 م 2026/11/01", "ماكس فود", "172379991", "مبنى تجاري", "https://drive.google.com/open?id=1GYfYliI8VNqGLHwe2Mwb_ooZUBF_vt9M", "18.256777, 42.632923"],
+      ["9:30:26 م 2026/11/01", "فندق عابر", "920000666", "مبنى تجاري", "https://drive.google.com/open?id=1KvRktQkdueE6DIMK2sKSdK3t9ztKU3Rm", "18.230168, 42.508738"],
+      ["9:32:01 م 2026/11/01", "ايسوزو مجموعة باخشب", "562000351", "مبنى تجاري", "https://drive.google.com/open?id=1-gqrGR-6iAIzcd-xorDDNPc0gJhxnSdy", ""],
+      ["9:34:05 م 2026/11/01", "وكالة شنجان", "92000875", "مبنى تجاري", "https://drive.google.com/open?id=1IFtoS33vG5ndFpdvKGfKrRcfPhlu34NX", "18.259378, 42.634228"],
+      ["9:35:37 م 2026/11/01", "محطة بن مضحية", "501599190", "مبنى تجاري", "https://drive.google.com/open?id=1QsO-b_zNDHXpgXHWNS-Wc7tKdDRt3ABp", "18.258802, 42.634033"],
+      ["9:38:03 م 2026/11/01", "صيدلية بوابة الصحة", "0507559815", "مبنى تجاري", "https://drive.google.com/open?id=14DLhQKcFQmRXU1DGRHNrGQWKyOZRrNAx", "18.257870, 42.633266"],
+      ["9:40:18 م 2026/11/01", "بروست ساخن", "535822530", "مبنى تجاري", "https://drive.google.com/open?id=12UGzS-rM3azcgG2g5E-cT0GpxHgVleRr", "18.254628, 42.630534"],
+      ["9:42:07 م 2026/11/01", "مطعم تمر هندي", "0550696978", "مبنى تجاري", "https://drive.google.com/open?id=1ULBYrDU4lBfsYX9Bg5BW6AQJ4r-zj6qW", "18.257294, 42.632379"],
+      ["9:44:57 م 2026/11/01", "بتر بيكري", "0531920222", "مبنى تجاري", "https://drive.google.com/open?id=11z_vC4UNbTtewmqYJjTOdG2_gII-oqjV", "18.255933, 42.630641"],
+      ["9:47:10 م 2026/11/01", "شركة إطار المستقبل", "537414830", "مبنى تجاري", "https://drive.google.com/open?id=1bfMSKwB_yWDOjg9EwQXUr-SFyiA5i3yj", "18.255933, 42.630641"],
+      ["9:51:10 م 2026/11/01", "مندي رجال المع", "0500359011", "مبنى تجاري", "https://drive.google.com/open?id=1NsdGV-PSH-zaS1XLP1XfUFcQjmqRqhx0", "18.308270, 42.740348"],
+      ["9:53:07 م 2026/11/01", "مندي ليالي الجنوب", "0507227321", "مبنى تجاري", "https://drive.google.com/open?id=1ISh3n-Il2hUgDlq-6DsNxBpmuLjAbDE6", "18.236716, 42.592489"],
+      ["9:55:32 م 2026/11/01", "ولائم الشيوخ", "557775003", "مبنى تجاري", "https://drive.google.com/open?id=1HaYCryt6IMRZeOPwE_-tWo1AoYw-0Cq6", "18.236152, 42.591974"],
+      ["9:25:36 ص 2026/11/03", "حسن معجب الحويزي", "050 000 0294", "مبنى تجاري", "https://drive.google.com/open?id=1puxs9osLIJuLUkdyrXSpdDLnzfPXYXLz", "18.240549, 42.572650"],
+      ["9:27:23 ص 2026/11/03", "إبراهيم درويش", "050 475 2629", "مبنى تجاري", "https://drive.google.com/open?id=1IXJAqhissq6j6IN1uji5sdKTssMyfhME", ""],
+      ["9:31:13 ص 2026/11/03", "ساسكو", "90000581", "مبنى تجاري", "https://drive.google.com/open?id=1wlnGN61sByZpNEgff_6YmJ9lXq10vkW5", "18.231911, 42.553568"],
+      ["9:34:13 ص 2026/11/03", "مطعم مرحبا", "541147780", "مبنى تجاري", "https://drive.google.com/open?id=1hErWxBpZhV91mPtX88lrKw6UkJYZHS0R", "18.230919, 42.549591"],
+      ["9:38:07 ص 2026/11/03", "عريكة ريفي", "503499796", "مبنى تجاري", "https://drive.google.com/open?id=1AeZ3cC0LVkE8yeiMWKGBQX47n_J9h_jo", "18.229477, 42.546451"],
+      ["9:43:34 ص 2026/11/03", "ساسكو ٢", "90000581", "مبنى تجاري", "https://drive.google.com/open?id=1sBUWXS7iekBUfe8v_yis3LftAtMZOD4k", ""],
+      ["1:02:13 م 2026/11/03", "هيف القحطاني", "0507078885", "مبنى تجاري", "https://drive.google.com/open?id=1fLsP8xAVt1COxbZceQvOv6fxBgiqgRM-", "18.218045, 42.527229"]
+    ];
+
+    // Normalize Arabic-Indic digits to standard Western digits
+    function toEnglishDigits(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+        .trim();
+    }
+
+    // Format phone number cleanly for display and tel: links
+    function normalizePhone(rawPhone) {
+      const cleaned = toEnglishDigits(rawPhone);
+      if (!cleaned) return { display: 'غير متوفر', tel: '' };
+      const digitsOnly = cleaned.replace(/\s+/g, '');
+      if (/^5\d{8}$/.test(digitsOnly)) {
+        return { display: '0' + digitsOnly, tel: '0' + digitsOnly };
+      }
+      return { display: cleaned, tel: digitsOnly };
+    }
+
+    // Extract Google Drive file ID from Drive open/file URL
+    function extractDriveFileId(driveUrl) {
+      if (!driveUrl) return null;
+      const firstUrl = String(driveUrl).split(',')[0].trim();
+      const match = firstUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/) || firstUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : null;
+    }
+
+    // Parse "lat, lng" string into valid numeric coordinates
+    function parseCoordinates(coordsStr) {
+      const normalized = toEnglishDigits(coordsStr);
+      if (!normalized) return null;
+      const parts = normalized.split(/[,\s]+/).filter(Boolean);
+      if (parts.length < 2) return null;
+      let lat = parseFloat(parts[0]);
+      let lng = parseFloat(parts[1]);
+      if (isNaN(lat) || isNaN(lng)) return null;
+      // Auto-correct if lat/lng were swapped (Asir lat ~18, lng ~42)
+      if (lat > 30 && lng < 30) {
+        const tmp = lat;
+        lat = lng;
+        lng = tmp;
+      }
+      return { lat, lng };
+    }
+
+    // Handle Google Drive image fallback chain
+    function handleDriveImgError(imgEl, fileId) {
+      if (!fileId) return;
+      const stage = imgEl.getAttribute('data-fallback-stage') || '0';
+      if (stage === '0') {
+        imgEl.setAttribute('data-fallback-stage', '1');
+        imgEl.src = `https://lh3.googleusercontent.com/d/${fileId}=w800`;
+      } else if (stage === '1') {
+        imgEl.setAttribute('data-fallback-stage', '2');
+        imgEl.src = `https://drive.google.com/uc?export=view&id=${fileId}`;
+      } else {
+        const wrap = imgEl.parentElement;
+        if (wrap) {
+          wrap.innerHTML = `
+            <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(30,41,59,0.85);color:#ffffff;padding:12px;text-align:center;">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00843D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span style="font-size:0.82rem;font-weight:700;">اضغط هنا لفتح صورة المبنى مباشرة</span>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // Inspector Theme Colors
+    const INSPECTOR_COLORS = {
+      'سعد عبيد': '#00843D',
+      'نايف مدشوش': '#8b5cf6',
+      'محمد مغرم': '#0284c7',
+      'عبدالله دحمان': '#f97316',
+      'طلال عبدالله': '#e11d48'
+    };
+
+    function getInspectorKey(name) {
+      if (!name) return '';
+      if (name.includes('سعد')) return 'saad';
+      if (name.includes('نايف')) return 'naif';
+      if (name.includes('مغرم')) return 'mohammed';
+      if (name.includes('دحمان')) return 'dahman';
+      if (name.includes('طلال')) return 'talal';
+      return '';
+    }
+
+    // Interactive Zoom To Inspector
+    window.zoomToInspector = function (inspectorName) {
+      let targetLayer = null;
+      if (inspectorName.includes('سعد')) targetLayer = driveBuildingsLayer;
+      else if (inspectorName.includes('نايف')) targetLayer = naifBuildingsLayer;
+      else if (inspectorName.includes('مغرم')) targetLayer = mohammedBuildingsLayer;
+      else if (inspectorName.includes('دحمان')) targetLayer = dahmanBuildingsLayer;
+      else if (inspectorName.includes('طلال')) targetLayer = talalBuildingsLayer;
+
+      if (!targetLayer) return;
+
+      if (!map.hasLayer(targetLayer)) {
+        map.addLayer(targetLayer);
+      }
+
+      const layers = targetLayer.getLayers();
+      if (!layers || layers.length === 0) {
+        alert('لا توجد مواقع مسجلة لهذا المراقب حالياً');
+        return;
+      }
+
+      const group = L.featureGroup(layers);
+      map.flyToBounds(group.getBounds(), { padding: [60, 60], duration: 1.2, maxZoom: 16 });
+    };
+
+    // Render rows from Google Sheet onto a target layer
+    function renderGoogleSheetBuildings(rows, targetLayer, inspectorName, customColor) {
+      targetLayer.clearLayers();
+      const pinColor = customColor || INSPECTOR_COLORS[inspectorName] || '#00843D';
+      let validCount = 0;
+
+      rows.forEach((row, index) => {
+        const timestamp = (row[0] || '').trim();
+        const owner = (row[1] || '').trim() || 'غير محدد';
+        const rawPhone = (row[2] || '').trim();
+        const buildingType = (row[3] || '').trim() || 'مبنى تجاري';
+        const driveUrl = (row[4] || '').trim();
+        const coordsRaw = (row[5] || '').trim();
+
+        // Skip header row if included
+        if (timestamp.includes('طابع زمني') || coordsRaw.includes('الاحداثيات') || coordsRaw.includes('الموقع')) {
+          return;
+        }
+
+        const coords = parseCoordinates(coordsRaw);
+        if (!coords) return; // Skip rows that don't have coordinates yet
+        validCount++;
+
+        const buildingNumber = String(index + 1);
+        const phoneObj = normalizePhone(rawPhone);
+        const fileId = extractDriveFileId(driveUrl);
+        // Google Drive Thumbnail endpoint works best for embedding Drive Form photos
+        const thumbUrl = fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w800` : '';
+        const viewUrl = fileId ? `https://drive.google.com/file/d/${fileId}/view` : (driveUrl || '#');
+
+        const isGov = buildingType.includes('حكومي');
+        const badgeColor = isGov ? '#683B89' : pinColor;
+        const badgeBg = isGov ? 'rgba(104, 59, 137, 0.25)' : `${pinColor}33`;
+
+        const marker = L.marker([coords.lat, coords.lng], {
+          icon: createBuildingIcon({ number: buildingNumber }, pinColor),
+          zIndexOffset: 1250
+        });
+
+        marker.bindTooltip(`مبنى #${buildingNumber} (${inspectorName}) - ${owner}`, {
+          sticky: true,
+          className: 'modern-street-tooltip'
+        });
+
+        const imageSectionHtml = fileId ? `
+          <div class="building-popup-img-wrap" onclick="window.open('${viewUrl}', '_blank')" title="فتح الصورة في قوقل درايف">
+            <img src="${thumbUrl}" alt="${owner}" class="building-popup-img" referrerpolicy="no-referrer" onerror="handleDriveImgError(this, '${fileId}')" />
+            <div class="building-zoom-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </div>
+          </div>
+        ` : '';
+
+        const popupHtml = `
+          <div class="popup-header">
+            <div class="popup-title" style="display:flex;align-items:center;gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${badgeColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                <line x1="9" y1="6" x2="9.01" y2="6"></line>
+                <line x1="15" y1="6" x2="15.01" y2="6"></line>
+                <line x1="9" y1="10" x2="9.01" y2="10"></line>
+                <line x1="15" y1="10" x2="15.01" y2="10"></line>
+                <line x1="9" y1="14" x2="9.01" y2="14"></line>
+                <line x1="15" y1="14" x2="15.01" y2="14"></line>
+                <line x1="9" y1="18" x2="15" y2="18"></line>
+              </svg>
+              <span>${owner}</span>
+            </div>
+            <span class="city-badge" style="color: #ffffff; background: ${badgeBg}; border-color: ${badgeColor};">
+              ${buildingType}
+            </span>
+          </div>
+
+          ${imageSectionHtml}
+
+          <div class="popup-body" style="margin-top: 10px;">
+            <div class="popup-row">
+              <span class="label">المراقب الميداني:</span>
+              <span class="value" style="color: ${pinColor} !important; font-weight: 800;">${inspectorName}</span>
+            </div>
+            <div class="popup-row">
+              <span class="label">رقم السجل في الجدول:</span>
+              <span class="value">#${buildingNumber}</span>
+            </div>
+            <div class="popup-row">
+              <span class="label">مالك المبنى / المنشأة:</span>
+              <span class="value">${owner}</span>
+            </div>
+            ${phoneObj.tel ? `
+            <div class="popup-row">
+              <span class="label">رقم التواصل:</span>
+              <a href="tel:${phoneObj.tel}" class="phone-badge-link" dir="ltr">${phoneObj.display}</a>
+            </div>
+            ` : ''}
+            <div class="popup-row">
+              <span class="label">الإحداثيات:</span>
+              <span class="value" dir="ltr" style="font-size:0.8rem;">${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}</span>
+            </div>
+          </div>
+
+          <a href="https://www.google.com/maps?q=${coords.lat},${coords.lng}" target="_blank" rel="noopener" class="google-maps-btn">
+            فتح الموقع في خرائط قوقل
+          </a>
+        `;
+
+        marker.bindPopup(popupHtml, {
+          maxWidth: 320,
+          className: 'building-custom-popup'
+        });
+
+        targetLayer.addLayer(marker);
+      });
+
+      // Update inspector pill counter
+      const key = getInspectorKey(inspectorName);
+      if (key) {
+        const el = document.getElementById(`count-${key}`);
+        if (el) el.textContent = validCount;
+      }
+    }
+
+    // 1. Render initial snapshots immediately so there is zero delay
+    renderGoogleSheetBuildings(INITIAL_GOOGLE_SHEET_ROWS, driveBuildingsLayer, 'سعد عبيد', INSPECTOR_COLORS['سعد عبيد']);
+    renderGoogleSheetBuildings(INITIAL_NAIF_ROWS, naifBuildingsLayer, 'نايف مدشوش', INSPECTOR_COLORS['نايف مدشوش']);
+    renderGoogleSheetBuildings(INITIAL_MOHAMMED_ROWS, mohammedBuildingsLayer, 'محمد مغرم', INSPECTOR_COLORS['محمد مغرم']);
+    renderGoogleSheetBuildings(INITIAL_DAHMAN_ROWS, dahmanBuildingsLayer, 'عبدالله دحمان', INSPECTOR_COLORS['عبدالله دحمان']);
+    renderGoogleSheetBuildings(INITIAL_TALAL_ROWS, talalBuildingsLayer, 'طلال عبدالله', INSPECTOR_COLORS['طلال عبدالله']);
+
+    // 2. JSONP callback for live updates for Saad Obeid
+    window.handleGoogleSheetDataSaad = function (response) {
+      try {
+        if (!response || !response.table || !response.table.rows) return;
+        const liveRows = [];
+        response.table.rows.forEach(r => {
+          const cells = r.c || [];
+          const getVal = (idx) => {
+            const cell = cells[idx];
+            if (!cell) return '';
+            return String(cell.f != null ? cell.f : (cell.v != null ? cell.v : ''));
+          };
+          const rowArr = [getVal(0), getVal(1), getVal(2), getVal(3), getVal(4), getVal(5)];
+          if (rowArr[0].includes('طابع زمني') || rowArr[5].includes('الاحداثيات')) return;
+          liveRows.push(rowArr);
+        });
+        if (liveRows.length > 0) {
+          renderGoogleSheetBuildings(liveRows, driveBuildingsLayer, 'سعد عبيد', INSPECTOR_COLORS['سعد عبيد']);
+        }
+      } catch (err) {
+        console.warn('Google Sheet live sync fallback used (Saad):', err);
+      }
+    };
+
+    // 3. JSONP callback for live updates for Naif Madshoosh
+    window.handleGoogleSheetDataNaif = function (response) {
+      try {
+        if (!response || !response.table || !response.table.rows) return;
+        const liveRows = [];
+        response.table.rows.forEach(r => {
+          const cells = r.c || [];
+          const getVal = (idx) => {
+            const cell = cells[idx];
+            if (!cell) return '';
+            return String(cell.f != null ? cell.f : (cell.v != null ? cell.v : ''));
+          };
+          // Naif Sheet columns: 0: Timestamp, 1: Phone, 2: Owner, 3: Type, 4: Image, 5: Coords
+          // Map to standard row: [Timestamp, Owner, Phone, Type, Image, Coords]
+          const rowArr = [getVal(0), getVal(2), getVal(1), getVal(3), getVal(4), getVal(5)];
+          if (rowArr[0].includes('طابع زمني') || rowArr[5].includes('الاحداثيات') || rowArr[5].includes('الموقع')) return;
+          liveRows.push(rowArr);
+        });
+        if (liveRows.length > 0) {
+          renderGoogleSheetBuildings(liveRows, naifBuildingsLayer, 'نايف مدشوش', INSPECTOR_COLORS['نايف مدشوش']);
+        }
+      } catch (err) {
+        console.warn('Google Sheet live sync fallback used (Naif):', err);
+      }
+    };
+
+    // 4. JSONP callback for live updates for Mohammed Mogram
+    window.handleGoogleSheetDataMohammed = function (response) {
+      try {
+        if (!response || !response.table || !response.table.rows) return;
+        const liveRows = [];
+        response.table.rows.forEach(r => {
+          const cells = r.c || [];
+          const getVal = (idx) => {
+            const cell = cells[idx];
+            if (!cell) return '';
+            return String(cell.f != null ? cell.f : (cell.v != null ? cell.v : ''));
+          };
+          // Mohammed Sheet columns: 0: Timestamp, 1: Phone, 2: Type, 3: Owner, 4: Image, 5: Coords
+          let p = getVal(1);
+          let o = getVal(3);
+          if (p.startsWith('05') || /^[0-9]+$/.test(p)) {
+            // normal
+          } else if (o.startsWith('05') || /^[0-9]+$/.test(o)) {
+            let tmp = p; p = o; o = tmp;
+          }
+          const rowArr = [getVal(0), o, p, getVal(2), getVal(4), getVal(5)];
+          if (rowArr[0].includes('طابع زمني') || rowArr[5].includes('الاحداثيات') || rowArr[5].includes('الموقع')) return;
+          liveRows.push(rowArr);
+        });
+        if (liveRows.length > 0) {
+          renderGoogleSheetBuildings(liveRows, mohammedBuildingsLayer, 'محمد مغرم', INSPECTOR_COLORS['محمد مغرم']);
+        }
+      } catch (err) {
+        console.warn('Google Sheet live sync fallback used (Mohammed):', err);
+      }
+    };
+
+    // 5. JSONP callback for live updates for Abdullah Dahman
+    window.handleGoogleSheetDataDahman = function (response) {
+      try {
+        if (!response || !response.table || !response.table.rows) return;
+        const liveRows = [];
+        response.table.rows.forEach(r => {
+          const cells = r.c || [];
+          const getVal = (idx) => {
+            const cell = cells[idx];
+            if (!cell) return '';
+            return String(cell.f != null ? cell.f : (cell.v != null ? cell.v : ''));
+          };
+          // Dahman Sheet columns: 0: Timestamp, 1: Phone, 2: Owner, 3: Type, 4: Image, 5: Coords
+          // Map to standard row: [Timestamp, Owner, Phone, Type, Image, Coords]
+          const rowArr = [getVal(0), getVal(2), getVal(1), getVal(3), getVal(4), getVal(5)];
+          if (rowArr[0].includes('طابع زمني') || rowArr[5].includes('الاحداثيات') || rowArr[5].includes('الموقع')) return;
+          liveRows.push(rowArr);
+        });
+        if (liveRows.length > 0) {
+          renderGoogleSheetBuildings(liveRows, dahmanBuildingsLayer, 'عبدالله دحمان', INSPECTOR_COLORS['عبدالله دحمان']);
+        }
+      } catch (err) {
+        console.warn('Google Sheet live sync fallback used (Dahman):', err);
+      }
+    };
+
+    // 6. JSONP callback for live updates for Talal Abdullah
+    window.handleGoogleSheetDataTalal = function (response) {
+      try {
+        if (!response || !response.table || !response.table.rows) return;
+        const liveRows = [];
+        response.table.rows.forEach(r => {
+          const cells = r.c || [];
+          const getVal = (idx) => {
+            const cell = cells[idx];
+            if (!cell) return '';
+            return String(cell.f != null ? cell.f : (cell.v != null ? cell.v : ''));
+          };
+          // Talal Sheet columns: 0: Timestamp, 1: Phone, 2: Owner, 3: Type, 4: Image, 5: Coords
+          // Map to standard row: [Timestamp, Owner, Phone, Type, Image, Coords]
+          const rowArr = [getVal(0), getVal(2), getVal(1), getVal(3), getVal(4), getVal(5)];
+          if (rowArr[0].includes('طابع زمني') || rowArr[5].includes('الاحداثيات') || rowArr[5].includes('الموقع')) return;
+          liveRows.push(rowArr);
+        });
+        if (liveRows.length > 0) {
+          renderGoogleSheetBuildings(liveRows, talalBuildingsLayer, 'طلال عبدالله', INSPECTOR_COLORS['طلال عبدالله']);
+        }
+      } catch (err) {
+        console.warn('Google Sheet live sync fallback used (Talal):', err);
+      }
+    };
+
+    // Inject JSONP script tags to fetch live Google Sheet data on every page load
+    (function loadLiveGoogleSheets() {
+      // Saad Obeid
+      const scriptSaad = document.createElement('script');
+      scriptSaad.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID_SAAD}/gviz/tq?tqx=responseHandler:handleGoogleSheetDataSaad&_=${Date.now()}`;
+      scriptSaad.async = true;
+      document.body.appendChild(scriptSaad);
+
+      // Naif Madshoosh
+      const scriptNaif = document.createElement('script');
+      scriptNaif.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID_NAIF}/gviz/tq?tqx=responseHandler:handleGoogleSheetDataNaif&_=${Date.now()}`;
+      scriptNaif.async = true;
+      document.body.appendChild(scriptNaif);
+
+      // Mohammed Mogram
+      const scriptMohammed = document.createElement('script');
+      scriptMohammed.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID_MOHAMMED}/gviz/tq?tqx=responseHandler:handleGoogleSheetDataMohammed&_=${Date.now()}`;
+      scriptMohammed.async = true;
+      document.body.appendChild(scriptMohammed);
+
+      // Abdullah Dahman
+      const scriptDahman = document.createElement('script');
+      scriptDahman.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID_DAHMAN}/gviz/tq?tqx=responseHandler:handleGoogleSheetDataDahman&_=${Date.now()}`;
+      scriptDahman.async = true;
+      document.body.appendChild(scriptDahman);
+
+      // Talal Abdullah
+      const scriptTalal = document.createElement('script');
+      scriptTalal.src = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID_TALAL}/gviz/tq?tqx=responseHandler:handleGoogleSheetDataTalal&_=${Date.now()}`;
+      scriptTalal.async = true;
+      document.body.appendChild(scriptTalal);
+    })();
+  </script>
+</body>
+
+</html>
